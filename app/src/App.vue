@@ -3,7 +3,7 @@ import { ref, Transition } from "vue";
 import Contents from "./components/Contents.vue";
 import Guide from "./components/Guide.vue";
 import TopBar from "./components/TopBar.vue";
-import SecretBox from "./components/SecretBox.vue";
+import SecretBox from "./components/SecretBox/SecretBox.vue";
 import type { TableOfContentsPart } from "./types";
 
 let sections = ref([] as TableOfContentsPart[]);

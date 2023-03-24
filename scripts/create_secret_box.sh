@@ -232,7 +232,12 @@ function main() {
     log -e "LocalSecret gRPC: $localsecret_grpc\n"
 
     local init_msg
-    init_msg='{"count": 16876}'
+    init_msg='{
+        "name": "My_NFT",
+        "symbol": "NFT",
+        "entropy": "foobar"
+    }'
+    
     code_id="$(upload_contract '.')"
     contract_hash="$(query_contract_hash "$code_id")"
     contract_addr="$(create_contract "$init_msg" "$code_id")"
