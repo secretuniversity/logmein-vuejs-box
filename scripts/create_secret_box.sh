@@ -235,7 +235,10 @@ function main() {
     init_msg='{
         "name": "My_NFT",
         "symbol": "NFT",
-        "entropy": "foobar"
+        "entropy": "foobar",
+        "config": {
+            "public_owner": true
+        }
     }'
     
     code_id="$(upload_contract '.')"

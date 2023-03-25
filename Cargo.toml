@@ -50,7 +50,6 @@ primitive-types = { version = "0.12.1", default-features = false }
 
 x25519-dalek = "1.1"
 getrandom = { version = "0.2", features = ["js"] }
-rand = "0.8.5"
 rand_chacha = { version = "0.2.2", default-features = false }
 rand_core = { version =  "0.5.1", default-features = false }
 sha2 = { version = "0.10.0", default-features = false }
