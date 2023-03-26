@@ -221,7 +221,8 @@ SECRET_BOX_CODE_HASH=''
 
 if [ "$LOCALSECRET_GRPC" == "" ]
 then
-    LOCALSECRET_GRPC='http://localhost:9091'
+    # LOCALSECRET_GRPC='http://localhost:9091'
+    LOCALSECRET_GRPC='http://localhost:1317'
 fi
 
 function main() {

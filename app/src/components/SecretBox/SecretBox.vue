@@ -5,10 +5,12 @@ import {
   handleGenerateKeypairs, handleMintNft, handleQueryPrivMetadataWithPermit, handleTransferNft,
   handleGeneratePermit, 
   initSecretjsClient,
+  handleQueryTokens,
 } from "./ContractApi"
 import type { 
   UserInputs, FormRow,
-  QueryResult,
+  PrivateMetadataAnswer,
+  TokensAnswer,
 } from './Types'
 
 
@@ -48,15 +50,18 @@ function handleScroll() {
  * and generate permit (ie: those that require signing with private key)
  */
 const formExecRows = reactive<FormRow[]>([{
-    headerText: "Execute functions",
-    inputs: [  ],
+    headerText: "Mint NFT",
+    inputs: [{
+      field: 'mintTokenId',
+      placeholderText: "optional token id"
+    }],
     buttons: [{
         onFunction: onMint, 
         buttonText: "Mint NFT",
     }]
   },
   {
-    headerText: "",
+    headerText: "Transfer NFT",
     inputs: [{
       field: 'transferRecipient',
       placeholderText: "account address",
@@ -97,7 +102,7 @@ const formExecRows = reactive<FormRow[]>([{
 
 /** The form inputs and buttons for contract query functions */
 const formQueryRows = reactive<FormRow[]>([{
-    headerText: "Permit queries",
+    headerText: "Query Private Metadata",
     inputs: [{
         field: 'queryTokenId',
         placeholderText: "enter token id",
@@ -111,9 +116,27 @@ const formQueryRows = reactive<FormRow[]>([{
         buttonText: "Permit Query: private metadata",
       }],
   },
+  {
+    headerText: "Update token ownership data",
+    inputs: [],
+    buttons: [{
+        onFunction: onQueryTokens,  
+        buttonText: "Update token ownership data",
+      }],
+  }
 ])
 
+/// selectively decide when to display forms depending on account and formRow
+let renderForm = (account: string, formRow: FormRow) => {
+  if (formRow.headerText === "Mint NFT" && account !== accounts[0].address) {
+    return false
+  } else {
+    return true
+  }
+}
+
 let inputs: UserInputs = reactive({
+  mintTokenId: {},
   transferRecipient: {},
   transferTokenId: {},
   genKeypairTokenId: {},
@@ -122,12 +145,20 @@ let inputs: UserInputs = reactive({
   permitId: 0,
 })
 
-
 let contractResponse = reactive({
-  query: {
-    token_uri: undefined,
-    extension: undefined,
-  } as QueryResult,
+  tokenList: {
+      // account0: [''],
+      // account1: [''],
+      account0: {token_list: {tokens: []}} as TokensAnswer,
+      account1: {token_list: {tokens: []}} as TokensAnswer,
+    },
+  
+  privMetadata: {
+    private_metadata: {
+      token_uri: undefined,
+      extension: undefined,
+    }
+  } as PrivateMetadataAnswer,
 
   permits: [{
     params: {
@@ -145,11 +176,17 @@ let contractResponse = reactive({
     },
   }] as Permit[],
 })
-// init contractResponse
-contractResponse.query=''
+// // init contractResponse
+// contractResponse.privMetadata = {
+//   private_metadata: {
+//     token_uri: undefined,
+//     extension: undefined,
+//   }
+// }
 
 async function onMint(acc: SecretNetworkClient) {
-  await handleMintNft(acc)  
+  await handleMintNft(acc, inputs.mintTokenId[acc.address])  
+  inputs.mintTokenId[acc.address] = ''
 }
 
 async function onTransferNft(acc: SecretNetworkClient) {
@@ -168,8 +205,32 @@ async function onGeneratePermit(acc: SecretNetworkClient): Promise<void> {
 
 async function onQueryPrivMetadataWithPermit() {
   const acc = accounts[0]
-  const res = await handleQueryPrivMetadataWithPermit(acc, inputs.queryTokenId, contractResponse.permits[inputs.permitId])
-  contractResponse.query = res
+  const res = await handleQueryPrivMetadataWithPermit(
+    acc, 
+    inputs.queryTokenId, 
+    contractResponse.permits[inputs.permitId]
+  )
+
+  if (typeof res === "string") {
+    console.log("query private metadata returned error")
+  } else {
+    contractResponse.privMetadata = res
+  }
+}
+
+async function onQueryTokens() {
+  const res0 = await handleQueryTokens(accounts[0]); 
+  const res1 = await handleQueryTokens(accounts[1]); 
+  if (typeof res0 === "string" || typeof res1 === "string") {
+    throw Error("Token ownership query returned error")
+  } else {
+    contractResponse.tokenList = {
+      // account0: res0.token_list.tokens,
+      // account1: res1.token_list.tokens,
+      account0: res0,
+      account1: res1,
+    }
+  }
 }
 
 async function onGenerateKeypairs(acc: SecretNetworkClient) {
@@ -204,25 +265,64 @@ async function onGenerateKeypairs(acc: SecretNetworkClient) {
     <div v-for="account in accounts.slice(0,2)">
       <h2 class="mt-4">Account: {{ account.address }}</h2>
       <div v-for="row in formExecRows" class="w-full justify-items-center mt-2 ml-4 mb-4">
-        <p class="italic mb-2">{{ row.headerText }}</p>
-        <form @submit.prevent=row.buttons[0].onFunction(account)>
-          <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
-            <input v-for="input in row.inputs" 
-              :class='row.inputs.length !== 2 
-                ? "col-span-2 rounded-md ml-4 outline" 
-                : "rounded-md ml-4 outline"'
-              :placeholder=input.placeholderText
-              v-model="//@ts-ignore implicit any for second field
-                inputs[input.field][account.address]"
-            >
-            <button class="w-4/5 bg-box-yellow self-center px-1 py-1 rounded-md ml-4"> 
-              {{ row.buttons[0].buttonText }} 
-            </button>
-          </div>
-        </form>
+        <div v-if="renderForm(account.address, row)">
+          <p class="italic mb-2">{{ row.headerText }}</p>
+          <form @submit.prevent=row.buttons[0].onFunction(account)>
+            <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
+              <input v-for="input in row.inputs" 
+                :class='row.inputs.length !== 2 
+                  ? "col-span-2 rounded-md ml-4 outline" 
+                  : "rounded-md ml-4 outline"'
+                :placeholder=input.placeholderText
+                v-model="//@ts-ignore implicit any for second field
+                  inputs[input.field][account.address]"
+              >
+              <button class="w-4/5 bg-box-yellow self-center px-1 py-1 rounded-md ml-4"> 
+                {{ row.buttons[0].buttonText }} 
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
       <hr class="border-gray-300">
     </div>
+
+    <h1 class="text-xl font-bold mt-5">Queries</h1>
+    <div v-for="qrow in formQueryRows" class="w-full justify-items-center mt-4 ml-4 mb-4">
+      <p class="italic mb-2">{{ qrow.headerText }}</p>
+      <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
+        <input v-for="input in qrow.inputs" 
+          class="rounded-md ml-4 outline"
+          :placeholder=input.placeholderText
+          v-model="inputs[input.field]"
+        >
+      </div>
+      <div class="grid grid-cols-3 mt-2 mb-2">
+        <button v-for="button in qrow.buttons"
+          @click=button.onFunction
+          class="w-4/5 col-start-3 bg-box-yellow self-center px-1 py-1 rounded-md ml-4 mt-1 mb-1"> 
+          {{ button.buttonText }} 
+        </button>
+      </div>
+    </div>
+
+    <p class="font-semibold">Permits
+      <span class="text-sm font-normal">(These are stored on the front-end client, not on-chain):</span>
+    </p>
+    <ol start="0" class="list-decimal list-inside text-left text-xs mb-6"> 
+      <li v-for="(permit, id) in contractResponse.permits">
+        Permit name: {{ permit.params.permit_name }}; Signature: {{ permit.signature.signature }}
+      </li>
+    </ol>
+
+    <div class="rounded-md outline text-center ml-3 mt-10 mb-10 py-3 bg-yellow-50">
+      <p class="font-semibold ">Tokens minted:</p>
+      <p>{{ contractResponse.tokenList }}</p>
+      <p class="font-semibold ">Private keys:</p>
+      <p>{{ contractResponse.privMetadata.private_metadata.extension?.auth_key }}</p>
+      <!-- <p>{{ contractResponse.privMetadata }}</p> -->
+    </div>
+
   </div>
 
   <!-- <div v-if="showApp">

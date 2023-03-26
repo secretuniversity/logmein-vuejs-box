@@ -4,13 +4,21 @@ import { SecretNetworkClient, } from "secretjs"
 // =========================================
 // Contract interface
 // =========================================
-type MintNftAnswer = {
+export type MintNftAnswer = {
   token_id: string,
 }
 
-type PrivateMetadataAnswer = { 
-  token_uri: string | undefined,
-  extension: Extension | undefined,
+export type PrivateMetadataAnswer = { 
+  private_metadata: {
+    token_uri: string | undefined,
+    extension: Extension | undefined,
+  }
+}
+
+export type TokensAnswer = {
+  token_list: {
+    tokens: string[],
+  }
 }
 
 type Extension = {
@@ -49,7 +57,8 @@ type Extension = {
 type errorResponse = string
 
 export type PrivateMetadataResult = PrivateMetadataAnswer | errorResponse
-export type QueryResult = PrivateMetadataResult
+export type TokensResult = TokensAnswer | errorResponse
+export type QueryResult = PrivateMetadataResult | TokensResult 
 
 export type MintNftResult = MintNftAnswer | errorResponse
 export type ExecuuteResult = MintNftResult
@@ -60,6 +69,8 @@ export type ExecuuteResult = MintNftResult
 // =========================================
 
 export type UserInputs = {
+  // mintNft message
+  mintTokenId: AccountLevelInputs<string>,
   // for transferNft message
   transferRecipient: AccountLevelInputs<string>,
   transferTokenId: AccountLevelInputs<string>,

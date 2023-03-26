@@ -1,7 +1,7 @@
-import { Wallet, SecretNetworkClient, Permit, fromUtf8 } from "secretjs"
+import { Wallet, SecretNetworkClient, Permit, fromUtf8, TxResponse } from "secretjs"
 import type {
   PrivateMetadataResult, MintNftResult, 
-  ExecuuteResult, QueryResult,
+  ExecuuteResult, QueryResult, TokensResult,
 } from './Types'
 
 // Get environment variables from .env
@@ -48,6 +48,7 @@ export const initSecretjsClient = async (accounts: SecretNetworkClient[]) => {
 
 export const handleMintNft = async (
   secretjs: SecretNetworkClient,
+  token_id: string,
 ) => {
 
   const tx = await secretjs.tx.compute.executeContract(
@@ -56,20 +57,27 @@ export const handleMintNft = async (
     contract_address: secretBoxAddress,
     code_hash: secretBoxHash,
     msg: {
-      mint_nft: {  },
+      mint_nft: {
+        token_id
+      },
     },
   },
   {
     gasLimit: 1_000_000,
   })
 
-  console.log(`Minted NFT ${fromUtf8(tx.data[0])}`)
+  // console.log(`Minted NFT ${fromUtf8(tx.data[0])}`)
+  if (tx.code === 0) {
+    console.log(`Minted NFT: ${token_id}`)
+  } else {
+    console.log(`Tx error: ${tx.rawLog}`)
+  }
 }
 
 export const handleTransferNft = async (
   secretjs: SecretNetworkClient,
   recipient: string,
-  tokenId: string,
+  token_id: string,
 ) => {
   const tx = await secretjs.tx.compute.executeContract(
   {
@@ -79,7 +87,7 @@ export const handleTransferNft = async (
     msg: {
       transfer_nft: { 
         recipient,
-        tokenId
+        token_id
       },
     },
   },
@@ -87,22 +95,26 @@ export const handleTransferNft = async (
     gasLimit: 1_000_000,
   })
 
-  console.log(`NFT ${tokenId} transferred to ${recipient}`)
+  if (tx.code === 0) {
+    console.log(`NFT ${token_id} transferred to ${recipient}`)
+  } else {
+    console.log(`Tx error: ${tx.rawLog}`)
+  }
 }
 
 export const handleGenerateKeypairs = async (
   secretjs: SecretNetworkClient,
-  tokenId: string,
+  token_id: string,
 ) => {
 
-  const tx = await secretjs.tx.compute.executeContract(
+  const tx: TxResponse = await secretjs.tx.compute.executeContract(
   {
     sender: secretjs.address,
     contract_address: secretBoxAddress,
     code_hash: secretBoxHash,
     msg: {
       generate_keypairs: {  
-        tokenId
+        token_id
       },
     },
   },
@@ -110,7 +122,11 @@ export const handleGenerateKeypairs = async (
     gasLimit: 1_000_000,
   })
 
-  console.log(`Generated keypairs for token id ${tokenId}`)
+  if (tx.code === 0) {
+    console.log(`Generated keypairs for token id ${token_id}`)
+  } else {
+    console.log(`Tx error: ${tx.rawLog}`)
+  }
 }
 
 export async function handleGeneratePermit(
@@ -126,21 +142,21 @@ export async function handleGeneratePermit(
     false,
   );
 
-  console.log(`Generated permit for ${account.address}`)
+  console.log(`Generated permit for ${account.address}: ${JSON.stringify(permit)}`)
 
   return permit;
 }
 
 export async function handleQueryPrivMetadataWithPermit(
   secretjs: SecretNetworkClient,
-  tokenId: string,
+  token_id: string,
   permit: Permit,
 ) {
   const msg = { with_permit: {
     permit,
     query: { 
       private_metadata: { 
-        tokenId,
+        token_id,
       }
     }
   }};
@@ -151,8 +167,27 @@ export async function handleQueryPrivMetadataWithPermit(
     query: msg,
   })) as PrivateMetadataResult
 
-  console.log("Queried private metadata with permit")
+  console.log(`Queried private metadata with permit. Response: ${response}`)
 
   return response;
 }
 
+export async function handleQueryTokens(
+  secretjs: SecretNetworkClient,
+) {
+  const owner = secretjs.address
+
+  const msg = { tokens: {
+    owner
+  }};
+  
+  const response = (await secretjs.query.compute.queryContract({
+    contract_address: secretBoxAddress,
+    code_hash: secretBoxHash,
+    query: msg,
+  })) as TokensResult
+
+  console.log(`Queried token ownership for ${secretjs.address}`)
+  
+  return response;
+}
