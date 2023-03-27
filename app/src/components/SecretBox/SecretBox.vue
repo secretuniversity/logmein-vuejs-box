@@ -12,9 +12,13 @@ import type {
   PrivateMetadataAnswer,
   TokensAnswer,
 } from './Types'
+import LogmeinService from './LogmeinService.vue'
+import ThirdPartyApp from './ThirdPartyApp.vue'
 
 
-const showApp = ref(true)
+const showAppContract= ref(true)
+const showAppLmiService = ref(false)
+const showAppThirdPartyApp = ref(false)
 let accounts: SecretNetworkClient[] = reactive([])
 
 onMounted(async () => {
@@ -38,7 +42,7 @@ function isDark() {
 }
 
 function handleScroll() {
-  if (showApp) {
+  if (showAppContract) {
     // To collapse App when user scrolls:
     // showApp.value = false
   }
@@ -108,7 +112,7 @@ const formQueryRows = reactive<FormRow[]>([{
         placeholderText: "enter token id",
     },
     {
-        field: 'permitId',
+        field: 'queryPermitId',
         placeholderText: "enter permit id number",
     }],
     buttons: [{
@@ -142,7 +146,9 @@ let inputs: UserInputs = reactive({
   genKeypairTokenId: {},
   permitName: {},
   queryTokenId: '',
-  permitId: 0,
+  queryPermitId: 0,
+  lmiTokenId: '',
+  lmiPermitId: 0,
 })
 
 let contractResponse = reactive({
@@ -208,7 +214,7 @@ async function onQueryPrivMetadataWithPermit() {
   const res = await handleQueryPrivMetadataWithPermit(
     acc, 
     inputs.queryTokenId, 
-    contractResponse.permits[inputs.permitId]
+    contractResponse.permits[inputs.queryPermitId]
   )
 
   if (typeof res === "string") {
@@ -247,141 +253,119 @@ async function onGenerateKeypairs(acc: SecretNetworkClient) {
 </script>
 
 <template>
-  <div class="grid items-center grid-cols-2">
-    <div class="flex pb-2 self-center">
-      <img src="../../assets/title_star.svg" alt="Richie Rich app">
-      <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white"></h2>
+  <div class="border border-gray-400 rounded-md pt-2 px-6 mb-3">
+    <div class="grid items-center grid-cols-2">
+      <div class="flex pb-2 self-center">
+        <img src="../../assets/title_star.svg" alt="Richie Rich app">
+        <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white">Contract Interface</h2>
+      </div>
+
+      <img @click="showAppContract = false" class="justify-self-end cursor-pointer" v-if="showAppContract && isLight()" src="../../assets/up.svg" alt="Hide application">
+      <img @click="showAppContract = true" class="justify-self-end cursor-pointer" v-if="!showAppContract && isLight()" src="../../assets/down.svg" alt="Show application">
+
+      <img @click="showAppContract = false" class="justify-self-end cursor-pointer" v-if="showAppContract && isDark()" src="../../assets/up_white.svg" alt="Hide application">
+      <img @click="showAppContract = true" class="justify-self-end cursor-pointer" v-if="!showAppContract && isDark()" src="../../assets/down_white.svg" alt="Show application">
     </div>
 
-    <img @click="showApp = false" class="justify-self-end cursor-pointer" v-if="showApp && isLight()" src="../../assets/up.svg" alt="Hide application">
-    <img @click="showApp = true" class="justify-self-end cursor-pointer" v-if="!showApp && isLight()" src="../../assets/down.svg" alt="Show application">
+    <div v-if="showAppContract">
+      <div v-for="account in accounts.slice(0,2)">
+        <h2 class="mt-4">Account: {{ account.address }}</h2>
+        <div v-for="row in formExecRows" class="w-full justify-items-center mt-2 ml-4 mb-4">
+          <div v-if="renderForm(account.address, row)">
+            <p class="italic mb-2">{{ row.headerText }}</p>
+            <form @submit.prevent=row.buttons[0].onFunction(account)>
+              <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
+                <input v-for="input in row.inputs" 
+                  :class='row.inputs.length !== 2 
+                    ? "col-span-2 rounded-md ml-4 outline" 
+                    : "rounded-md ml-4 outline"'
+                  :placeholder=input.placeholderText
+                  v-model="//@ts-ignore implicit any for second field
+                    inputs[input.field][account.address]"
+                >
+                <button class="w-4/5 bg-box-yellow dark:bg-gray-500 self-center px-1 py-1 rounded-md ml-4"> 
+                  {{ row.buttons[0].buttonText }} 
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <hr class="border-gray-300">
+      </div>
 
-    <img @click="showApp = false" class="justify-self-end cursor-pointer" v-if="showApp && isDark()" src="../../assets/up_white.svg" alt="Hide application">
-    <img @click="showApp = true" class="justify-self-end cursor-pointer" v-if="!showApp && isDark()" src="../../assets/down_white.svg" alt="Show application">
-  </div>
-
-  <div v-if="showApp">
-    <h1 class="text-xl font-bold mt-10">Contract Interface</h1>
-    <div v-for="account in accounts.slice(0,2)">
-      <h2 class="mt-4">Account: {{ account.address }}</h2>
-      <div v-for="row in formExecRows" class="w-full justify-items-center mt-2 ml-4 mb-4">
-        <div v-if="renderForm(account.address, row)">
-          <p class="italic mb-2">{{ row.headerText }}</p>
-          <form @submit.prevent=row.buttons[0].onFunction(account)>
-            <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
-              <input v-for="input in row.inputs" 
-                :class='row.inputs.length !== 2 
-                  ? "col-span-2 rounded-md ml-4 outline" 
-                  : "rounded-md ml-4 outline"'
-                :placeholder=input.placeholderText
-                v-model="//@ts-ignore implicit any for second field
-                  inputs[input.field][account.address]"
-              >
-              <button class="w-4/5 bg-box-yellow self-center px-1 py-1 rounded-md ml-4"> 
-                {{ row.buttons[0].buttonText }} 
-              </button>
-            </div>
-          </form>
+      <h1 class="text-xl font-bold mt-5">Queries</h1>
+      <div v-for="qrow in formQueryRows" class="w-full justify-items-center mt-4 ml-4 mb-4">
+        <p class="italic mb-2">{{ qrow.headerText }}</p>
+        <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
+          <input v-for="input in qrow.inputs" 
+            class="rounded-md ml-4 outline"
+            :placeholder=input.placeholderText
+            v-model="inputs[input.field]"
+          >
+        </div>
+        <div class="grid grid-cols-3 mt-2 mb-2">
+          <button v-for="button in qrow.buttons"
+            @click=button.onFunction
+            class="w-4/5 col-start-3 bg-box-yellow dark:bg-gray-500 self-center px-1 py-1 rounded-md ml-4 mt-1 mb-1"> 
+            {{ button.buttonText }} 
+          </button>
         </div>
       </div>
-      <hr class="border-gray-300">
-    </div>
 
-    <h1 class="text-xl font-bold mt-5">Queries</h1>
-    <div v-for="qrow in formQueryRows" class="w-full justify-items-center mt-4 ml-4 mb-4">
-      <p class="italic mb-2">{{ qrow.headerText }}</p>
-      <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
-        <input v-for="input in qrow.inputs" 
-          class="rounded-md ml-4 outline"
-          :placeholder=input.placeholderText
-          v-model="inputs[input.field]"
-        >
-      </div>
-      <div class="grid grid-cols-3 mt-2 mb-2">
-        <button v-for="button in qrow.buttons"
-          @click=button.onFunction
-          class="w-4/5 col-start-3 bg-box-yellow self-center px-1 py-1 rounded-md ml-4 mt-1 mb-1"> 
-          {{ button.buttonText }} 
-        </button>
+      <p class="font-semibold">Permits
+        <span class="text-sm font-normal">(These are stored on the front-end client, not on-chain):</span>
+      </p>
+      <ol start="0" class="list-decimal list-inside text-left text-xs mb-6"> 
+        <li v-for="(permit, id) in contractResponse.permits">
+          Permit name: {{ permit.params.permit_name }}; Signature: {{ permit.signature.signature }}
+        </li>
+      </ol>
+
+      <div class="rounded-md outline text-center ml-3 mt-10 mb-10 py-3 bg-yellow-50 dark:bg-gray-800">
+        <p class="font-semibold ">Tokens minted:</p>
+        <p>{{ contractResponse.tokenList }}</p>
+        <p class="font-semibold ">Private keys:</p>
+        <p>{{ contractResponse.privMetadata.private_metadata.extension?.auth_key }}</p>
       </div>
     </div>
-
-    <p class="font-semibold">Permits
-      <span class="text-sm font-normal">(These are stored on the front-end client, not on-chain):</span>
-    </p>
-    <ol start="0" class="list-decimal list-inside text-left text-xs mb-6"> 
-      <li v-for="(permit, id) in contractResponse.permits">
-        Permit name: {{ permit.params.permit_name }}; Signature: {{ permit.signature.signature }}
-      </li>
-    </ol>
-
-    <div class="rounded-md outline text-center ml-3 mt-10 mb-10 py-3 bg-yellow-50">
-      <p class="font-semibold ">Tokens minted:</p>
-      <p>{{ contractResponse.tokenList }}</p>
-      <p class="font-semibold ">Private keys:</p>
-      <p>{{ contractResponse.privMetadata.private_metadata.extension?.auth_key }}</p>
-      <!-- <p>{{ contractResponse.privMetadata }}</p> -->
-    </div>
-
   </div>
 
-  <!-- <div v-if="showApp">
-    <h1 class="text-xl font-bold mt-10">Account-level messages</h1>
-    <div v-for="account in accounts">
-      <h2 class="mt-4">Account: {{ account.address }}</h2>
-      <div v-for="row in formExecRows" class="w-full justify-items-center mt-2 ml-4 mb-4">
-        <p class="italic mb-2">{{ row.headerText }}</p>
-        <form @submit.prevent=row.buttons[0].onFunction(account)>
-          <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
-            <input v-for="input in row.inputs" 
-              :class='row.inputs.length !== 2 
-                ? "col-span-2 rounded-md ml-4 outline" 
-                : "rounded-md ml-4 outline"'
-              :placeholder=input.placeholderText
-              v-model="//@ts-ignore implicit any for second field
-                inputs[input.field][account.address]"
-            >
-            <button class="w-4/5 bg-box-yellow self-center px-1 py-1 rounded-md ml-4"> 
-              {{ row.buttons[0].buttonText }} 
-            </button>
-          </div>
-        </form>
+  <div class="border border-gray-400 rounded-md pt-2 px-6 mb-3">
+    <div class="grid items-center grid-cols-2">
+      <div class="flex pb-2 self-center">
+        <img src="../../assets/title_star.svg" alt="Richie Rich app">
+        <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white">Log Me In Service</h2>
       </div>
-      <hr class="border-gray-300">
-    </div>
-      
-    <h1 class="text-xl font-bold mt-5">Queries</h1>
-    <div v-for="qrow in formQueryRows" class="w-full justify-items-center mt-4 ml-4 mb-4">
-      <p class="italic mb-2">{{ qrow.headerText }}</p>
-      <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
-        <input v-for="input in qrow.inputs" 
-          class="rounded-md ml-4 outline"
-          :placeholder=input.placeholderText
-          v-model="inputs[input.field]"
-        >
-      </div>
-      <div class="grid grid-cols-3 mt-2 mb-2">
-        <button v-for="button in qrow.buttons"
-          @click=button.onFunction
-          class="w-4/5 col-start-3 bg-box-yellow self-center px-1 py-1 rounded-md ml-4 mt-1 mb-1"> 
-          {{ button.buttonText }} 
-        </button>
-      </div>
+
+      <img @click="showAppLmiService = false" class="justify-self-end cursor-pointer" v-if="showAppLmiService && isLight()" src="../../assets/up.svg" alt="Hide application">
+      <img @click="showAppLmiService = true" class="justify-self-end cursor-pointer" v-if="!showAppLmiService && isLight()" src="../../assets/down.svg" alt="Show application">
+
+      <img @click="showAppLmiService = false" class="justify-self-end cursor-pointer" v-if="showAppLmiService && isDark()" src="../../assets/up_white.svg" alt="Hide application">
+      <img @click="showAppLmiService = true" class="justify-self-end cursor-pointer" v-if="!showAppLmiService && isDark()" src="../../assets/down_white.svg" alt="Show application">
     </div>
 
-    <p class="font-semibold">Permits
-      <span class="text-sm font-normal">(These are stored on the front-end client, not on-chain):</span>
-    </p>
-    <ol start="0" class="list-decimal list-inside text-left text-xs mb-6"> 
-      <li v-for="(permit, id) in contractResponse.permits">
-        Permit name: {{ permit.params.permit_name }}; Signature: {{ permit.signature.signature }}
-      </li>
-    </ol>
-
-    <div class="rounded-md outline text-center ml-3 mt-10 mb-10 py-3 bg-yellow-50">
-      <p class="font-semibold ">Query response:</p>
-      <p>{{ contractResponse.query }}</p>
+    <div v-if="showAppLmiService">
+      <LogmeinService :accounts="accounts" :permits="contractResponse.permits"/>
     </div>
-    
-  </div> -->
+  </div>
+
+  <div class="border border-gray-400 rounded-md pt-2 px-6 mb-3">
+    <div class="grid items-center grid-cols-2">
+      <div class="flex pb-2 self-center">
+        <img src="../../assets/title_star.svg" alt="Richie Rich app">
+        <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white">Third Party App</h2>
+      </div>
+
+      <img @click="showAppThirdPartyApp = false" class="justify-self-end cursor-pointer" v-if="showAppThirdPartyApp && isLight()" src="../../assets/up.svg" alt="Hide application">
+      <img @click="showAppThirdPartyApp = true" class="justify-self-end cursor-pointer" v-if="!showAppThirdPartyApp && isLight()" src="../../assets/down.svg" alt="Show application">
+
+      <img @click="showAppThirdPartyApp = false" class="justify-self-end cursor-pointer" v-if="showAppThirdPartyApp && isDark()" src="../../assets/up_white.svg" alt="Hide application">
+      <img @click="showAppThirdPartyApp = true" class="justify-self-end cursor-pointer" v-if="!showAppThirdPartyApp && isDark()" src="../../assets/down_white.svg" alt="Show application">
+    </div>
+
+    <div v-if="showAppThirdPartyApp">
+      <ThirdPartyApp :accounts="accounts" />
+    </div>
+  </div>
+
 </template>

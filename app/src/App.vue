@@ -28,7 +28,7 @@ let showContents = ref(true);
       <div class="bg-white dark:bg-primary-dark pb-2">
         <div class="max-w-4xl mx-auto">
           <div class="border border-gray-400 rounded-md pt-2 px-6 mb-24">
-            <SecretBox title="Simple Secret Counter App"></SecretBox>
+            <SecretBox title="Log Me In App"></SecretBox>
           </div>
         </div>
       </div>

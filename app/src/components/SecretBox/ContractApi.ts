@@ -167,7 +167,7 @@ export async function handleQueryPrivMetadataWithPermit(
     query: msg,
   })) as PrivateMetadataResult
 
-  console.log(`Queried private metadata with permit. Response: ${response}`)
+  console.log(`Queried private metadata with permit. Response: ${JSON.stringify(response)}`)
 
   return response;
 }

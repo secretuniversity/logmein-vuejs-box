@@ -80,7 +80,9 @@ export type UserInputs = {
   permitName: AccountLevelInputs<string>,
   // for permit query
   queryTokenId: string,
-  permitId: number,
+  queryPermitId: number,
+  lmiTokenId: string,
+  lmiPermitId: 0,
 } 
 
 type AccountLevelInputs<T> = {
@@ -88,14 +90,14 @@ type AccountLevelInputs<T> = {
   [key: string]: T;
 }
 
-export type FormRow = {
+export type FormRow<T = UserInputs> = {
   headerText: string
-  inputs: FormInput[],
+  inputs: FormInput<T>[],
   buttons: FormButton<SecretNetworkClient>[],
 }
 
-export type FormInput = {
-  field: keyof UserInputs,
+export type FormInput<T = UserInputs> = {
+  field: keyof T,
   placeholderText: string,
 }
 
