@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@noble/curves": "^0.9.0",
     "@noble/ed25519": "^2.0.0",
     "vue": "~3.2.37"
   },

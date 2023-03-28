@@ -1,7 +1,7 @@
 import { Wallet, SecretNetworkClient, Permit, fromUtf8, TxResponse } from "secretjs"
 import type {
   PrivateMetadataResult, MintNftResult, 
-  ExecuuteResult, QueryResult, TokensResult,
+  ExecuteResult, QueryResult, TokensResult, NftInfoResult, 
 } from './Types'
 
 // Get environment variables from .env
@@ -190,4 +190,23 @@ export async function handleQueryTokens(
   console.log(`Queried token ownership for ${secretjs.address}`)
   
   return response;
+}
+
+export async function handleNftInfo(
+  secrectjs: SecretNetworkClient,
+  token_id: string,
+) {
+  const msg = { nft_info: {
+    token_id
+  }}
+  
+  const response = (await secrectjs.query.compute.queryContract({
+    contract_address: secretBoxAddress,
+    code_hash: secretBoxHash,
+    query: msg,
+  })) as NftInfoResult
+  
+  console.log(`Queried info of token_id: ${token_id}. Response: ${JSON.stringify(response)}`)
+
+  return response
 }

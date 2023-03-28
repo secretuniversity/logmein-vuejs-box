@@ -11,14 +11,13 @@ import type {
   UserInputs, FormRow,
   PrivateMetadataAnswer,
   TokensAnswer,
+LoginRequest,
 } from './Types'
 import LogmeinService from './LogmeinService.vue'
-import ThirdPartyApp from './ThirdPartyApp.vue'
 
 
 const showAppContract= ref(true)
-const showAppLmiService = ref(false)
-const showAppThirdPartyApp = ref(false)
+const showAppLmiService = ref(true)
 let accounts: SecretNetworkClient[] = reactive([])
 
 onMounted(async () => {
@@ -49,6 +48,12 @@ function handleScroll() {
 }
 
 // -------------------
+
+const loginRequest: LoginRequest = reactive({
+  signature: Uint8Array.from([]),
+  message: Uint8Array.from([]),
+  tokenId: '',
+})
 
 /** The form inputs and buttons for contract execute functions
  * and generate permit (ie: those that require signing with private key)
@@ -241,6 +246,7 @@ async function onQueryTokens() {
 
 async function onGenerateKeypairs(acc: SecretNetworkClient) {
   const res = await handleGenerateKeypairs(acc, inputs.genKeypairTokenId[acc.address])
+  inputs.genKeypairTokenId[acc.address] = ''
 }
 
 // if not connected to smart contract: ------------
@@ -334,7 +340,7 @@ async function onGenerateKeypairs(acc: SecretNetworkClient) {
     <div class="grid items-center grid-cols-2">
       <div class="flex pb-2 self-center">
         <img src="../../assets/title_star.svg" alt="Richie Rich app">
-        <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white">Log Me In Service</h2>
+        <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white">Log Me In</h2>
       </div>
 
       <img @click="showAppLmiService = false" class="justify-self-end cursor-pointer" v-if="showAppLmiService && isLight()" src="../../assets/up.svg" alt="Hide application">
@@ -345,26 +351,7 @@ async function onGenerateKeypairs(acc: SecretNetworkClient) {
     </div>
 
     <div v-if="showAppLmiService">
-      <LogmeinService :accounts="accounts" :permits="contractResponse.permits"/>
-    </div>
-  </div>
-
-  <div class="border border-gray-400 rounded-md pt-2 px-6 mb-3">
-    <div class="grid items-center grid-cols-2">
-      <div class="flex pb-2 self-center">
-        <img src="../../assets/title_star.svg" alt="Richie Rich app">
-        <h2 class="ml-2 text-2xl font-medium tracking-widest text-[#200E32] dark:text-white">Third Party App</h2>
-      </div>
-
-      <img @click="showAppThirdPartyApp = false" class="justify-self-end cursor-pointer" v-if="showAppThirdPartyApp && isLight()" src="../../assets/up.svg" alt="Hide application">
-      <img @click="showAppThirdPartyApp = true" class="justify-self-end cursor-pointer" v-if="!showAppThirdPartyApp && isLight()" src="../../assets/down.svg" alt="Show application">
-
-      <img @click="showAppThirdPartyApp = false" class="justify-self-end cursor-pointer" v-if="showAppThirdPartyApp && isDark()" src="../../assets/up_white.svg" alt="Hide application">
-      <img @click="showAppThirdPartyApp = true" class="justify-self-end cursor-pointer" v-if="!showAppThirdPartyApp && isDark()" src="../../assets/down_white.svg" alt="Show application">
-    </div>
-
-    <div v-if="showAppThirdPartyApp">
-      <ThirdPartyApp :accounts="accounts" />
+      <LogmeinService :accounts="accounts" :permits="contractResponse.permits" />
     </div>
   </div>
 

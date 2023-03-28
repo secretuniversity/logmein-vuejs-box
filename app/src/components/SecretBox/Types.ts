@@ -15,6 +15,14 @@ export type PrivateMetadataAnswer = {
   }
 }
 
+export type NftInfoAnswer = { 
+  // public metadata
+  nft_info: {
+    token_uri: string | undefined,
+    extension: Extension | undefined,
+  }
+}
+
 export type TokensAnswer = {
   token_list: {
     tokens: string[],
@@ -57,11 +65,12 @@ type Extension = {
 type errorResponse = string
 
 export type PrivateMetadataResult = PrivateMetadataAnswer | errorResponse
+export type NftInfoResult = NftInfoAnswer | errorResponse
 export type TokensResult = TokensAnswer | errorResponse
-export type QueryResult = PrivateMetadataResult | TokensResult 
+export type QueryResult = PrivateMetadataResult | NftInfoResult | TokensResult
 
 export type MintNftResult = MintNftAnswer | errorResponse
-export type ExecuuteResult = MintNftResult
+export type ExecuteResult = MintNftResult
 
 
 // =========================================
@@ -104,4 +113,14 @@ export type FormInput<T = UserInputs> = {
 export type FormButton<T> = {
   onFunction: (acc: T) => Promise<void>,// | (() => Promise<void>),
   buttonText: string,
+}
+
+// =========================================
+// LogMeIn service
+// =========================================
+
+export type LoginRequest = {
+  signature: Uint8Array,
+  message: Uint8Array,
+  tokenId: string,
 }
