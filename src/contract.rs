@@ -44,7 +44,8 @@ pub const ID_BLOCK_SIZE: u32 = 64;
 
 
 // additional for keypair generation
-use x25519_dalek::{StaticSecret, PublicKey};
+// use x25519_dalek::{StaticSecret, PublicKey};
+use ed25519_dalek::{Keypair, PublicKey, SecretKey};
 use crate::token::Extension;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -594,7 +595,7 @@ pub fn generate_keypair(
     sender: &Addr,
     prng_seed: Vec<u8>,
     user_entropy: Option<String>
-) -> (PublicKey, StaticSecret, Vec<u8>) {
+) -> (PublicKey, SecretKey, Vec<u8>) {
 
     // generate new rng seed
     let new_prng_bytes: [u8; 32] = match user_entropy {
@@ -603,11 +604,12 @@ pub fn generate_keypair(
     };
 
     // generate and return key pair
-    let rng = ChaChaRng::from_seed(new_prng_bytes);
-    let scrt_key = StaticSecret::new(rng);
-    let pub_key = PublicKey::from(&scrt_key);
+    let mut rng = ChaChaRng::from_seed(new_prng_bytes);
+    // let scrt_key = StaticSecret::new(rng);
+    // let pub_key = PublicKey::from(&scrt_key);
+    let keypair = Keypair::generate(&mut rng);
 
-    (pub_key, scrt_key, new_prng_bytes.to_vec())
+    (keypair.public, keypair.secret, new_prng_bytes.to_vec())
 }
 
 /// Returns [u8;32]

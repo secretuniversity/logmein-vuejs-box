@@ -62,7 +62,7 @@ mod tests {
         let info = mock_info("instantiator", &[]);
         let pair = generate_keypair(&env, &info.sender, saved_prng_seed, None);
 
-        let key_meta = meta.add_auth_key(pair.clone().0.as_bytes()).unwrap();
+        let key_meta = meta.add_auth_key(pair.0.as_bytes()).unwrap();
 
         let key_meta_expect = Metadata {
             token_uri: None,
@@ -70,7 +70,7 @@ mod tests {
                 name: Some("MyNFT".to_string()),
                 description: None,
                 image: Some("uri".to_string()),
-                auth_key: Some(pair.clone().0.as_bytes().clone()),
+                auth_key: Some(pair.0.as_bytes().clone()),
                 ..Extension::default()
             }),
         };
@@ -165,7 +165,7 @@ mod tests {
                 name: Some("MyNFT".to_string()),
                 description: None,
                 image: Some("uri".to_string()),
-                auth_key: Some([185, 160, 13, 158, 132, 200, 22, 163, 142, 239, 69, 215, 94, 196, 120, 143, 251, 151, 239, 114, 109, 249, 242, 78, 104, 159, 5, 225, 254, 201, 57, 12]),
+                auth_key: Some([76, 75, 133, 204, 122, 41, 35, 234, 115, 161, 72, 35, 49, 18, 200, 177, 177, 40, 178, 49, 210, 37, 86, 243, 252, 119, 204, 167, 62, 240, 126, 104]),
                 ..Extension::default()
             }),
         });
@@ -175,7 +175,7 @@ mod tests {
                 name: Some("MyNFTpriv".to_string()),
                 description: Some("Nifty".to_string()),
                 image: Some("privuri".to_string()),
-                auth_key: Some([152, 120, 181, 79, 58, 94, 161, 100, 224, 137, 3, 54, 35, 195, 99, 76, 37, 96, 89, 96, 251, 114, 146, 37, 56, 4, 148, 199, 181, 64, 126, 100]),
+                auth_key: Some([157, 120, 181, 79, 58, 94, 161, 100, 224, 137, 3, 54, 35, 195, 99, 76, 37, 96, 89, 96, 251, 114, 146, 37, 56, 4, 148, 199, 181, 64, 126, 228]),
                 ..Extension::default()
             }),
         });

@@ -121,7 +121,7 @@ const verifyLogin = async (
 let loginAttemptResult = ref(false)
 
 async function onButtonClicked() {
-  const loginRequest = await lmiSign()
+  loginRequest = await lmiSign()
   verifyLogin(loginRequest)
 }
 
