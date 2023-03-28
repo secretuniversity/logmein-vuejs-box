@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { onMounted, ref, reactive, computed } from 'vue'
-import { SecretNetworkClient, Permit } from "secretjs"
+import { onMounted, ref, reactive,  } from 'vue'
+import { SecretNetworkClient, Permit,  } from "secretjs"
 import { 
-  handleGenerateKeypairs, handleMintNft, handleQueryPrivMetadataWithPermit, handleTransferNft,
+  handleGenerateKeypairs, handleMintNft, handleTransferNft,
   handleGeneratePermit, 
   initSecretjsClient,
   handleQueryTokens,
+queryPubKey,
 } from "./ContractApi"
 import type { 
   UserInputs, FormRow,
-  PrivateMetadataAnswer,
   TokensAnswer,
 LoginRequest,
 } from './Types'
@@ -110,27 +110,13 @@ const formExecRows = reactive<FormRow[]>([{
 ])
 
 /** The form inputs and buttons for contract query functions */
-const formQueryRows = reactive<FormRow[]>([{
-    headerText: "Query Private Metadata",
-    inputs: [{
-        field: 'queryTokenId',
-        placeholderText: "enter token id",
-    },
-    {
-        field: 'queryPermitId',
-        placeholderText: "enter permit id number",
-    }],
-    buttons: [{
-        onFunction: onQueryPrivMetadataWithPermit,  
-        buttonText: "Permit Query: private metadata",
-      }],
-  },
+const formQueryRows = reactive<FormRow[]>([
   {
-    headerText: "Update token ownership data",
+    headerText: "Update token ownership data and public key data",
     inputs: [],
     buttons: [{
-        onFunction: onQueryTokens,  
-        buttonText: "Update token ownership data",
+        onFunction: onUpdateButton,  
+        buttonText: "Query token data",
       }],
   }
 ])
@@ -150,8 +136,8 @@ let inputs: UserInputs = reactive({
   transferTokenId: {},
   genKeypairTokenId: {},
   permitName: {},
-  queryTokenId: '',
-  queryPermitId: 0,
+  // queryTokenId: '',
+  // queryPermitId: 0,
   lmiTokenId: '',
   lmiPermitId: 0,
 })
@@ -164,12 +150,12 @@ let contractResponse = reactive({
       account1: {token_list: {tokens: []}} as TokensAnswer,
     },
   
-  privMetadata: {
-    private_metadata: {
-      token_uri: undefined,
-      extension: undefined,
-    }
-  } as PrivateMetadataAnswer,
+  // privMetadata: {
+  //   private_metadata: {
+  //     token_uri: undefined,
+  //     extension: undefined,
+  //   }
+  // } as PrivateMetadataAnswer,
 
   permits: [{
     params: {
@@ -214,39 +200,56 @@ async function onGeneratePermit(acc: SecretNetworkClient): Promise<void> {
   contractResponse.permits.push(res)
 }
 
-async function onQueryPrivMetadataWithPermit() {
-  const acc = accounts[0]
-  const res = await handleQueryPrivMetadataWithPermit(
-    acc, 
-    inputs.queryTokenId, 
-    contractResponse.permits[inputs.queryPermitId]
-  )
-
-  if (typeof res === "string") {
-    console.log("query private metadata returned error")
-  } else {
-    contractResponse.privMetadata = res
-  }
-}
-
-async function onQueryTokens() {
+async function queryTokens() {
   const res0 = await handleQueryTokens(accounts[0]); 
   const res1 = await handleQueryTokens(accounts[1]); 
   if (typeof res0 === "string" || typeof res1 === "string") {
     throw Error("Token ownership query returned error")
   } else {
-    contractResponse.tokenList = {
+    const tokenList = {
       // account0: res0.token_list.tokens,
       // account1: res1.token_list.tokens,
       account0: res0,
       account1: res1,
     }
+    contractResponse.tokenList = tokenList
+    return tokenList
   }
 }
 
 async function onGenerateKeypairs(acc: SecretNetworkClient) {
   const res = await handleGenerateKeypairs(acc, inputs.genKeypairTokenId[acc.address])
   inputs.genKeypairTokenId[acc.address] = ''
+}
+
+async function getAllPubKeys() {
+  // const _tableData: TableData[] = []
+  tableData.value = []
+  for (const key in contractResponse.tokenList) {
+    const accountInfo = contractResponse.tokenList[key as keyof typeof contractResponse.tokenList];
+    for (const tokenId of accountInfo.token_list.tokens) {
+      const pubKey = await queryPubKey(accounts[0], tokenId)
+      // _tableData.push({
+      tableData.value.push({
+        tokenId,
+        pubKey
+      })
+    }
+  }
+  // Convert to refs to ensure reactivity works properly
+  // tableData= reactive(_tableData) as TableData[]
+}
+
+type TableData = {
+  tokenId: string,
+  pubKey: number[],
+}
+
+let tableData = ref([] as TableData[])
+
+async function onUpdateButton() {
+  const tokenList = await queryTokens()
+  await getAllPubKeys()
 }
 
 // if not connected to smart contract: ------------
@@ -330,8 +333,20 @@ async function onGenerateKeypairs(acc: SecretNetworkClient) {
       <div class="rounded-md outline text-center ml-3 mt-10 mb-10 py-3 bg-yellow-50 dark:bg-gray-800">
         <p class="font-semibold ">Tokens minted:</p>
         <p>{{ contractResponse.tokenList }}</p>
-        <p class="font-semibold ">Private keys:</p>
-        <p>{{ contractResponse.privMetadata.private_metadata.extension?.auth_key }}</p>
+        <table class="table-auto border border-collapse mt-8 mx-3 border-gray-400">
+          <thead>
+            <tr>
+              <th class="border border-gray-400 px-4 py-2">token_id</th>
+              <th class="border border-gray-400 px-4 py-2">Public auth_key</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="entry in tableData" :key="entry.tokenId">
+              <td class="border border-gray-400 px-4 py-2">{{ entry.tokenId }}</td>
+              <td class="border border-gray-400 px-4 py-2 text-xs">{{ entry.pubKey }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

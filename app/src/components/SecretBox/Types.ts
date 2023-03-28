@@ -88,8 +88,8 @@ export type UserInputs = {
   // for generate permit
   permitName: AccountLevelInputs<string>,
   // for permit query
-  queryTokenId: string,
-  queryPermitId: number,
+  // queryTokenId: string,
+  // queryPermitId: number,
   lmiTokenId: string,
   lmiPermitId: 0,
 } 

@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import * as ed from '@noble/ed25519'
 import { FormRow, LoginRequest, UserInputs } from './Types'
-import { handleQueryPrivMetadataWithPermit } from './ContractApi';
+import { handleQueryPrivMetadataWithPermit, queryPubKey } from './ContractApi';
 import { Permit, SecretNetworkClient } from 'secretjs';
 import { reactive, ref, } from "vue"
-import { handleNftInfo } from "./ContractApi";
 
 
 const props = defineProps<{
@@ -75,21 +74,6 @@ async function lmiSign() {
   } as LoginRequest
 }
 
-async function queryNftInfo(
-  token_id: string,
-) {
-  const acc = props.accounts[0]
-  const res = await handleNftInfo(acc, token_id); 
-
-  if (typeof res !== 'string') {
-    // returns public metadata auth_key, ie: public key
-    console.log(`queried public auth_key: ${res.nft_info.extension?.auth_key}`)
-    return res.nft_info.extension?.auth_key
-  } else {
-    throw Error(`returned error ${res}`)
-  }
-}
-
 async function verifySignature(
   signature: Uint8Array, 
   message: Uint8Array, 
@@ -103,7 +87,7 @@ const verifyLogin = async (
   loginRequest: LoginRequest,
 ) => {
   console.log(`verifying login for token_id: ${loginRequest.tokenId}; with signature: ${loginRequest.signature}; message: ${loginRequest.message}`)
-  const pubKey = await queryNftInfo(loginRequest.tokenId)
+  const pubKey = await queryPubKey(props.accounts[0], loginRequest.tokenId)
   if (pubKey !== undefined ) {
     const isValid = await verifySignature(
       loginRequest.signature,
@@ -121,7 +105,14 @@ const verifyLogin = async (
 let loginAttemptResult = ref(false)
 
 async function onButtonClicked() {
+  // to make sure that app renders success or failure even if LMI fails to sign, eg: if permit is invalid
+  loginRequest.tokenId = inputs.lmiTokenId
+  loginAttemptResult.value = false
+
+  // LMI generates signature
   loginRequest = await lmiSign()
+
+  // Third Party App verifies siganture
   verifyLogin(loginRequest)
 }
 
@@ -151,7 +142,14 @@ async function onButtonClicked() {
   
   <div>
     <h1 class="text-xl font-bold mt-5">Secretbook app</h1>
-    <p>Current login request: {{ loginRequest }}</p>
-    <p>Attempted to log in with token_id: {{ loginRequest.tokenId }}. Success?: {{ loginAttemptResult }}</p>
+    <p>Secretbook is a hypothetical social media application where users can create personal profiles and share their life stories, post memes and chat with friends.</p>
+    <p class="mt-8 text-center">Attempted to log in with token_id: {{ loginRequest.tokenId }}</p>
+    <div v-if="loginAttemptResult !== null" class="flex justify-center mt-1 mb-5">
+    <div :class="{ 'bg-green-100': loginAttemptResult, 'bg-red-100': !loginAttemptResult }" class="p-4 rounded-lg">
+      <p :class="{ 'text-green-700': loginAttemptResult, 'text-red-700': !loginAttemptResult }" class="font-medium">
+        {{ loginAttemptResult ? 'Login success' : 'Login failed' }}
+      </p>
+    </div>
+  </div>
   </div>
 </template>

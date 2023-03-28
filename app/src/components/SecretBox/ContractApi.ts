@@ -193,14 +193,14 @@ export async function handleQueryTokens(
 }
 
 export async function handleNftInfo(
-  secrectjs: SecretNetworkClient,
+  secretjs: SecretNetworkClient,
   token_id: string,
 ) {
   const msg = { nft_info: {
     token_id
   }}
   
-  const response = (await secrectjs.query.compute.queryContract({
+  const response = (await secretjs.query.compute.queryContract({
     contract_address: secretBoxAddress,
     code_hash: secretBoxHash,
     query: msg,
@@ -209,4 +209,25 @@ export async function handleNftInfo(
   console.log(`Queried info of token_id: ${token_id}. Response: ${JSON.stringify(response)}`)
 
   return response
+}
+
+/** Queries the public key stored in the public metadata in the contract */
+export async function queryPubKey(
+  secretjs: SecretNetworkClient,
+  token_id: string,
+): Promise<number[]> {
+  const res = await handleNftInfo(secretjs, token_id); 
+
+  if (typeof res !== 'string') {
+    // returns public metadata auth_key, ie: public key
+    const pubkey = res.nft_info.extension?.auth_key
+    console.log(`queried public auth_key: ${pubkey}`)
+    if ( pubkey === undefined ) {
+      return []
+    } else {
+      return pubkey
+    }
+  } else {
+    throw Error(`returned error ${res}`)
+  }
 }
