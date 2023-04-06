@@ -5,12 +5,12 @@ import type {
 } from './Types'
 
 // Get environment variables from .env
-const localSecretUrl: string = import.meta.env.VITE_LOCALSECRET_GRPC
+const localSecretUrl: string = import.meta.env.VITE_LOCALSECRET_LCD
 const secretBoxCode: number = import.meta.env.VITE_SECRET_BOX_CODE
 const secretBoxHash: string = import.meta.env.VITE_SECRET_BOX_HASH
 const secretBoxAddress: string = import.meta.env.VITE_SECRET_BOX_ADDRESS
 
-console.log(`local gRPC = ${localSecretUrl}`)
+console.log(`local LCD = ${localSecretUrl}`)
 console.log(`code id = ${secretBoxCode}`)
 console.log(`contract hash = ${secretBoxHash}`)
 console.log(`contract address = ${secretBoxAddress}`)
@@ -31,7 +31,7 @@ export const initSecretjsClient = async (accounts: SecretNetworkClient[]) => {
     const wallet = new Wallet(mnemonic)
     // let secretjs = await SecretNetworkClient.create({
     let secretjs = new SecretNetworkClient({
-      //grpcWebUrl: "http://localhost:9091",
+      //lcd: "http://localhost:1317",
       url: localSecretUrl,
       chainId: "secretdev-1",
       wallet: wallet,

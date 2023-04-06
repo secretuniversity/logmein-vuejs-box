@@ -222,15 +222,15 @@ SECRET_BOX_CODE_HASH=''
 if [ "$LOCALSECRET_GRPC" == "" ]
 then
     # LOCALSECRET_GRPC='http://localhost:9091'
-    LOCALSECRET_GRPC='http://localhost:1317'
+    LOCALSECRET_LCD='http://localhost:1317'
 fi
 
 function main() {
     log '              <####> Create Secret Box contract <####>'
     log "secretcli version in the docker image is: $(secretcli version)\n"
 
-    localsecret_grpc=$LOCALSECRET_GRPC
-    log -e "LocalSecret gRPC: $localsecret_grpc\n"
+    localsecret_lcd=$LOCALSECRET_LCD
+    log -e "LocalSecret LCD: $localsecret_lcd\n"
 
     local init_msg
     init_msg='{
@@ -253,16 +253,16 @@ function main() {
     log -e "secret contract code hash: $contract_hash\n"
 
     log 'Storing environment variables:'
-    echo -e "SECRET_BOX_CODE=$code_id\nSECRET_BOX_ADDRESS=$contract_addr\nSECRET_BOX_HASH=$contract_hash\nLOCALSECRET_GRPC=$localsecret_grpc" > .env
-    echo -e "VITE_SECRET_BOX_CODE=$code_id\nVITE_SECRET_BOX_ADDRESS=$contract_addr\nVITE_SECRET_BOX_HASH=$contract_hash\nVITE_LOCALSECRET_GRPC=$localsecret_grpc" > app/.env
-    echo -e "SECRET_BOX_CODE=$code_id\nSECRET_BOX_ADDRESS=$contract_addr\nSECRET_BOX_HASH=$contract_hash\nLOCALSECRET_GRPC=$localsecret_grpc" > tests/.env
+    echo -e "SECRET_BOX_CODE=$code_id\nSECRET_BOX_ADDRESS=$contract_addr\nSECRET_BOX_HASH=$contract_hash\nLOCALSECRET_LCD=$localsecret_lcd" > .env
+    echo -e "VITE_SECRET_BOX_CODE=$code_id\nVITE_SECRET_BOX_ADDRESS=$contract_addr\nVITE_SECRET_BOX_HASH=$contract_hash\nVITE_LOCALSECRET_LCD=$localsecret_lcd" > app/.env
+    echo -e "SECRET_BOX_CODE=$code_id\nSECRET_BOX_ADDRESS=$contract_addr\nSECRET_BOX_HASH=$contract_hash\nLOCALSECRET_LCD=$localsecret_lcd" > tests/.env
     log "\n==="
     log "=== Use 'source .env' to set the SECRET BOX environment variables in your local bash shell"
     log "===\n"
 
     log 'Returning environment variables for Gitpod workspace'
     # If everything else worked, return successful status
-    echo "SECRET_BOX_CODE=$code_id SECRET_BOX_ADDRESS=$contract_addr SECRET_BOX_HASH=$contract_hash LOCALSECRET_GRPC=$localsecret_grpc"
+    echo "SECRET_BOX_CODE=$code_id SECRET_BOX_ADDRESS=$contract_addr SECRET_BOX_HASH=$contract_hash LOCALSECRET_LCD=$localsecret_lcd"
     return 0
 }
 
