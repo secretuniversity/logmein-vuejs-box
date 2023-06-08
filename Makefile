@@ -73,6 +73,45 @@ launchapp:
 	yarn --cwd ./app/ install && \
 	yarn --cwd ./app/ dev
 
+CONTR_SRC = ./src
+APP_SRC = ./app/src/components/SecretBox
+CONTR_SOL = ./app/tutorial/solutions/contract
+APP_SOL = ./app/tutorial/solutions/webapp
+CONTR_START = ./app/tutorial/lessonstart/contract
+APP_START = ./app/tutorial/lessonstart/webapp
+
+.PHONY: apply-src-as-solutions
+apply-src-as-solutions:
+	cp $(CONTR_SOL)/** ./local/solutions/contract
+	cp $(CONTR_SRC)/** $(CONTR_SOL)
+
+	cp $(APP_SOL)/** ./local/solutions/webapp
+	cp $(APP_SRC)/** $(APP_SOL)
+
+.PHONY: apply-solutions-on-src
+apply-solutions-on-src:
+	cp $(CONTR_SRC)/** ./local/src/contract
+	cp $(CONTR_SOL)/** $(CONTR_SRC)
+
+	cp $(CONTR_SRC)/** ./local/src/webapp
+	cp $(APP_SOL)/** $(APP_SRC)
+
+.PHONY: apply-src-as-lessonstart
+apply-src-as-lessonstart:
+	cp $(CONTR_START)/** ./local/lessonstart/contract
+	cp $(CONTR_SRC)/** $(CONTR_START)
+
+	cp $(APP_START)/** ./local/lessonstart/webapp
+	cp $(APP_SRC)/** $(APP_START)
+
+.PHONY: apply-lessonstart-on-src
+apply-lessonstart-on-src:
+	cp $(CONTR_SRC)/** ./local/src/contract
+	cp $(CONTR_START)/** $(CONTR_SRC)
+
+	cp $(APP_SRC)/** ./local/src/webapp
+	cp $(APP_START)/** $(APP_SRC)
+
 .PHONY: clean
 clean:
 	cargo clean

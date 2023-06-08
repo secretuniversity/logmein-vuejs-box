@@ -23,3 +23,6 @@ contract.wasm*
 tests/node_modules/*
 .env
 **/.env
+
+# misc
+/local
