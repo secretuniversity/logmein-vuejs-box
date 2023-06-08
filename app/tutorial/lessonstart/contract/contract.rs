@@ -44,9 +44,10 @@ pub const ID_BLOCK_SIZE: u32 = 64;
 
 
 // additional for keypair generation
-// use x25519_dalek::{StaticSecret, PublicKey};
 use ed25519_dalek::{Keypair, PublicKey, SecretKey};
-use crate::token::Extension;
+    //
+    // complete code here
+    //
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 pub const PRNG_SEED_KEY: &[u8] = b"prngseed";
@@ -110,7 +111,9 @@ pub fn instantiate(
     let minters = vec![admin_raw];
     save(deps.storage, CONFIG_KEY, &config)?;
     save(deps.storage, MINTERS_KEY, &minters)?;
-    save(deps.storage, PRNG_SEED_KEY, &prng_seed)?;
+    //
+    // complete code here
+    //
 
     if msg.royalty_info.is_some() {
         store_royalties(
@@ -476,9 +479,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
             deps,
             &info.sender, 
             env, 
-            &config, 
-            &token_id, 
-            entropy
+            //
+            // complete code here
+            //
         )
     };
     pad_handle_result(response, BLOCK_SIZE)
@@ -500,29 +503,19 @@ pub fn metadata_generate_keypair(
     mut deps: DepsMut,
     sender: &Addr,
     env: Env,
-    config: &Config,
-    token_id: &String,
-    entropy: Option<String>,
+    //
+    // complete code here
+    //
 ) -> StdResult<Response> {
-    let custom_err = format!("Not authorized to update metadata of token {}", token_id);
-    // if token supply is private, don't leak that the token id does not exist
-    // instead just say they are not authorized for that token
-    let opt_err = if config.token_supply_is_public {
-        None
-    } else {
-        Some(&*custom_err)
-    };
-    let (token, idx) = get_token(deps.storage, token_id, opt_err)?;
-    let sender_raw = deps.api.addr_canonicalize(sender.as_ref())?;
+    //
+    // complete code here
+    //
 
-    // check autherization of the sender
-    if !( sender_raw == token.owner || sender_raw == config.admin ) {
-        let minters: Vec<CanonicalAddr> =
-            may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
-        if !config.minter_may_update_metadata || !minters.contains(&sender_raw) {
-            return Err(StdError::generic_err(custom_err));
-        }
-    }
+    //
+    // edit code below
+    //
+    let entropy = Option::Some("placeholder".to_string());
+    let idx = 0u32;
 
     metadata_generate_keypair_impl(&mut deps, sender, &env, entropy, idx)
 }
@@ -544,35 +537,9 @@ pub fn metadata_generate_keypair_impl(
     entropy: Option<String>,
     idx: u32,
 ) -> StdResult<Response> {
-    // generate the new public/private key pair
-    let prng_seed: Vec<u8> = load(deps.storage, PRNG_SEED_KEY).unwrap();
-    let (pubkey, scrtkey, new_prng_seed) = generate_keypair(env, sender, prng_seed, entropy);
-    save(deps.storage, PRNG_SEED_KEY, &new_prng_seed).unwrap();
-
-    // update private metadata with the private key.
-    let mut priv_meta_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
-    let maybe_priv_meta: Option<Metadata> = may_load(&priv_meta_store, &idx.to_le_bytes())?;
-    let priv_meta = maybe_priv_meta.unwrap_or(
-        Metadata {
-            token_uri: None,
-            extension: Some(Extension::default()),
-        }
-    );
-    let new_priv_meta =  priv_meta.add_auth_key(&scrtkey.to_bytes())?;
-    save(&mut priv_meta_store, &idx.to_le_bytes(), &new_priv_meta)?;
-
-    // update public metadata with the public key
-    let mut pub_meta_store = PrefixedStorage::new(deps.storage, PREFIX_PUB_META);
-    let maybe_pub_meta: Option<Metadata> = may_load(&pub_meta_store, &idx.to_le_bytes())?;
-    let pub_meta = maybe_pub_meta.unwrap_or(
-        Metadata {
-            token_uri: None,
-            extension: Some(Extension::default()),
-        }
-    );
-    let new_pub_meta =  pub_meta.add_auth_key(&pubkey.to_bytes())?;
-    save(&mut pub_meta_store, &idx.to_le_bytes(), &new_pub_meta)?;
-
+    //
+    // complete code here
+    //
 
     Ok(
         Response::new().set_data(to_binary(&ExecuteAnswer::GenerateKeypairs {
@@ -596,20 +563,16 @@ pub fn generate_keypair(
     prng_seed: Vec<u8>,
     user_entropy: Option<String>
 ) -> (PublicKey, SecretKey, Vec<u8>) {
+    //
+    // complete code here
+    //
 
-    // generate new rng seed
-    let new_prng_bytes: [u8; 32] = match user_entropy {
-        Some(s) => new_entropy(env, sender, prng_seed.as_ref(), s.as_bytes()),
-        None => new_entropy(env, sender, prng_seed.as_ref(), prng_seed.as_ref()),
-    };
-
-    // generate and return key pair
-    let mut rng = ChaChaRng::from_seed(new_prng_bytes);
-    // let scrt_key = StaticSecret::new(rng);
-    // let pub_key = PublicKey::from(&scrt_key);
+    //
+    // edit code below
+    //
+    let mut rng = ChaChaRng::from_seed([0;32]);
     let keypair = Keypair::generate(&mut rng);
-
-    (keypair.public, keypair.secret, new_prng_bytes.to_vec())
+    (keypair.public, keypair.secret, Vec::new())
 }
 
 /// Returns [u8;32]
@@ -627,17 +590,11 @@ pub fn new_entropy(
     seed: &[u8], 
     entropy: &[u8]
 )-> [u8;32] {
-    // 16 here represents the lengths in bytes of the block height and time.
-    let entropy_len = 16 + sender.to_string().len() + entropy.len();
-    let mut rng_entropy = Vec::with_capacity(entropy_len);
-    rng_entropy.extend_from_slice(&env.block.height.to_be_bytes());
-    rng_entropy.extend_from_slice(&env.block.time.nanos().to_be_bytes());
-    rng_entropy.extend_from_slice(sender.to_string().as_bytes());
-    rng_entropy.extend_from_slice(entropy);
-
-    let mut rng = Prng::new(seed, &rng_entropy);
-
-    rng.rand_bytes()
+    //
+    // complete code here
+    //
+    
+    [0;32]
 }
 
 
@@ -4480,7 +4437,9 @@ fn transfer_impl(
     };
 
     // gen keypairs
-    metadata_generate_keypair_impl(deps, &deps.api.addr_humanize(sender)?, env, None, idx)?;
+    //
+    // complete code here
+    //
 
     // store the tx
     store_transfer(

@@ -20,18 +20,17 @@ pub struct Token {
 
 impl Metadata {
     pub fn add_auth_key(&self, new_key: &[u8; 32]) -> StdResult<Metadata> {
-        if self.token_uri.is_some() {
-            return Err(StdError::generic_err(
-                "Keys cannot be added to a metadata using token_uri.",
-            ));
-        }
-
-        let ext = &self.extension.clone().unwrap_or_default();
+        //
+        // complete code here
+        //
 
         Ok(
             Metadata {
                 token_uri: None,
-                extension: Some(ext.add_auth_key(new_key)),
+                //
+                // edit code below
+                //
+                extension: None,
             }
         )
     }

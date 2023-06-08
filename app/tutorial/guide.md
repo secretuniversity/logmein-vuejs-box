@@ -1,989 +1,749 @@
-# Secret Counter Box Tutorial
+# Logmein Box Tutorial
 
-## Introduction
-This box is an introductory or beginner-level quickstart based on the [counter template contract](https://github.com/secretuniversity/secret-template-cw1). If you would like to work with this Secret Box your local environment, follow the "Getting Started" steps [here](https://github.com/secretuniversity/secret-counter-vuejs-box/blob/main/README.md).
-
-_Secret Counter_ is a contract that illustrates how to handle basic query and state changes (e.g. transactions) on the Secret Network.
-
-> You can think of a secret contract as smart, but in addition provides programmable privacy--meaning you decide what input, output and state data
-is public or private, depending on your use case or scenario.
-
-In the next sections, we'll take a look at the overall architecture and design of our smart contract, go through the creation of your contract, and then you'll get a chance to modify your contract and application code to:
-
-- query the contract's counter value
-- increment the counter's value
-- and reset the counter
-
-> While the frontend allows you to reset and click the '+' button to increment the counter, the contract's state is unchanged because we haven't "wired" the frontend to the backend contract yet.
-
-At this point your _Secret Counter Box_ workspace should be setup and includes: 
-
-* a running `LocalSecret` blockchain instance
-* an initial version of the _Secret Counter_ contract has been uploaded to `LocalSecret`
-* and _Simple Secret Counter_ has been launched, which includes this tutorial
-
-You should have the following three terminal windows open in your local environment:
-
-1. `LocalSecret` - the first terminal shows the blockchain starting up and producing blocks
-2. `Secret Box Workspace` - the 2nd terminal is where your contract gets compiled, deployed, and is the window you'll use to enter commands as you go through this tutorial
-3. `Secret Box Frontend` - the 3rd terminal is where your application server is launched, after `LocalSecret` is running and the _Secret Counter_ contract has been created
-
-## Contract Architecture
-
-The design of our _Secret Counter_ contract accounts for two possible users: 
-
-- The contract owner (you) who instantiates the contract 
-- The general user of our contract who can query, increment, and reset the counter.
-
-![](https://i.imgur.com/z3R428U.png)
-
-### Project Structure
-
-The project structure includes an area for your contract logic, messages and state (`src/`), integration tests (`tests/`) and the _Simple Secret Counter_ DApp (`app/`). 
-
-> We've marked the files you'll be modifying with red dots below.
-
-![](https://i.imgur.com/wHKaV48.png)
-
-### Understanding Basic CosmWasm
-
-A Secret contract, which is based on [CosmWasm](https://docs.cosmwasm.com) smart contracts, contains **3 entry points** we are able to interact with:
-
-- `instantiate()` - receives the `InstantiateMsg` and saves the initial value of the counter to the contract state. The instantiation of a CosmWasm smart contract is performed by the contract owner.
-
-- `execute()` - handles transExercise which mutate or change the state of the contract. In our case, the `Increment` and `Reset` messages are handled here to update the counter's value.
-
-- `query()` - handles messages which do **not** change the state of the contract. To recieve the counter's state we'll utilize the `QueryCount` message.
-
-A good place to start when developing secret contracts is to design the messages, defined in the [msg.rs](), that will be handled by your contract's entry points.
-
-**Entry Point: Instantiate**
-We've defined our `InstantiateMsg` as:
+This is a fork of SNIP721 commit ed7c59d, committed on 4th Jan 2023.
 
 ```rust
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
-pub struct InstantiateMsg {
-      pub count: i32,
+    GenerateKeypairs {
+        token_id: String,
+        entropy: Option<String>,
+    },
+```
+
+## Introduction
+
+Welcome to the Logmein Box tutorial! In this tutorial, we will implement cryptography at the contract level, and use it as a log in tool. The this contract is mostly based on [this](TBC), although we implement it slightly differently in this box, particularly the front end.
+
+We would like to note that using cryptography at the contract level can be complex for production-level dapps. Particularly, it is easy to have vulnerabilities, particularly if you don't fully understand the cryptography. Alas, this contract as it stands is definitely not suitable as a production-level contract. Our goal is to demonstrate concepts and help you learn new things to take with you to develop your own production-level dapps. We will discuss some of the issues later in the lesson, for your interest. Perhaps you could find ways to solve these issues and create an actual user-facing logmein dapp?
+
+You can work through this Secret box using either Gitpod or your local environment. If you prefer to use your local environment, you can follow the “Getting Started” steps in the [README of this repo](https://github.com/secretuniversity/logmein-vuejs-box/blob/main/README.md) to set everything up.
+
+## Contract overview
+
+In our box, we have these hypothetical services:
+- A web app called Secretbook, a hypothetical social media application that the user wishes to log into. From here, we will refer to our web app simply as `Secretbook` to mean "any web application that is able to accept a login using the Logmein service"
+- Logmein, which is a service that sits in the middle between the user and the web app. This service could be offered by a third party (analogous to a password manager), or can be directly controlled by the user him/herself. The Logmein contract essentially implements this service.
+
+The idea is to allow the user to log in to Secretbook by owning a Secret NFT. The The Logmein service enables users to prove ownership of the NFT without revealing their account address directly with Secretbook. This is done using a modified SNIP721 reference implementation contract (which implement's Secret Network's NFT standard with additional features). The modified NFT contract allows users to create a cryptographic keypair. The public key is stored in the public metadata, and the private key in the private metadata. 
+
+When the user wishes to log into Secretbook, the follow steps occur:
+- Secretbook randomly generates an arbitrary message and shares it with the user 
+- the user connects with Logmein, which requests permission to view the private metadata
+- Logmein then uses the private key stored in the private metadata to sign the message Secretbook generated, which produces a digital signature.
+- The digital signature is then handed to the Secrebook to verify. Secretbook verifies the signature against the public key stored in the NFT's public metadata. If successfully verified, it means that the user indeed owns that NFT, as they would not have been able to access the private key to sign the randomly generated message otherwise.
+
+Of course, there are some issues with this implementation, for example the need to trust the Logmein service. We will discuss this and other issues later in the lesson. But for our Secret Box exercise, our goal is to implement this design, which we can think of as the first step towards an actual login service.
+
+
+## Web application overview
+
+In addition to the contract itself, we also have a web application frontend as part of this box. We will use secret.js and Vue.js, walking through the required code to get a front end application to interact with the Secret contract. The frontend GUI design itself is intended to help developers understand the mechanics of the Logmein design. As with most of our other contract-focused boxes, the GUI is not streamlined in a way that is suitable or intended for end-users.
+
+Of course, if you want, you can implement a GUI more suitable for an end-user facing app, which will primarily be a "pure" Web2 undertaking. We won't cover this, as our focus for ths box is the interface between the front-end and the contract, in addition to the signature verification process done by Secretbook.
+
+## Tutorial starting point
+
+Start by opening the Secret box on Gitpod or in your local environment. If you are using Gitpod, your environment should be properly set up and your workspace should include:
+- A running LocalSecret blockchain instance
+- An initial version of the contract uploaded to LocalSecret
+- An incomplete web app launched, which includes this tutorial
+
+Additionally, you should also have three terminal windows open:
+- LocalSecret: The first terminal displays the blockchain starting up and producing blocks
+- Secret Box workspace: The second terminal is where you will compile and deploy your contract and enter commands as you go through this tutorial
+- Web application frontend: The third terminal is where you will launch your application server after LocalSecret is running and the Secret contract has been created
+
+If you are running locally, make sure to have these three terminals open as well.
+
+The files you will be working with are:
+- src/* : these are the contract source files
+- app/src/components/SecretBox/* : these are the front-end source files
+
+In these files, look for sections marked with the comments `// complete code here`. These are the core parts of code required to implement authenticated queries.
+
+
+---------------------------
+
+## Implementing viewing keys
+
+Viewing keys act a bit like passwords against the public key (which are like usernames). By creating a strong viewing key, it will be computationally infeasible for someone to have unauthorized access to your account by guessing your key. 
+
+Our contract already implements the execute functions we need. However, the queries have not yet been implemented. At this point, the contract can accept two query messages `all_info` and `am_i_richest` but simply returns a blank response to the caller.
+
+So let's do something about it.
+
+Begin by opening the src/msg.rs file, and find the QueryMsg enum.
+
+```rust
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryMsg {
+    AllInfo { 
+        addr: Addr,
+        key: String,
+    },
+    AmIRichest {
+        addr: Addr,
+        key: String,
+    },
+    //
+    // complete code here
+    // 
 }
 ```
 
-That means that when we create the contract, we can initialize it with the following JSON representation of the above message:
+The above code defines the QueryMsg variants for our two viewing key queries. Notice they each accept two fields: addr and key. These two fields are the minimum required for any viewing key query, as these two fields are used by the contract to authenticate a viewing key. If this is not clear to you, we explain this in more detail in our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
 
+We decided to have an easy start. Everything is already done here, so there is nothing further for you to do. The incomplete code is for permits, which we will do later. Just examine the code above and make sure there is nothing unclear.
+
+### Exercise: implement get_validation_params method
+
+Complete the code implementing the `get_validation_params` method on QueryMsg. You will see this in the src/msg.rs file, which is the incomplete code for you to work on:
+
+```rust
+impl QueryMsg {
+    pub fn get_validation_params(&self) -> (/* complete code here */) {
+        //
+        // complete code here
+        //
+    }
+}
 ```
-{ "count": Some i32 Number }
+
+This method should return the address and viewing key for all possible viewing key query variants in QueryMsg. It’s also a good idea to verify that the address is in a valid format, which will require an additional input field.
+
+<details> <summary> Hint 1:</summary>
+
+The return type should be 
 ```
-**Entry Point: Query**
-Our `QueryMsg` definition contains the `GetCount` message, which is defined as an enum variant:
+StdResult<(Addr, String)>
+```
+</details>
+
+<details> <summary> Hint 2:</summary>
+
+The method should look at the possible variants of QueryMsg, and return the corresponding address and key. So, first line of code in the method should be:
+```
+        match self {
+```
+</details>
+
+<details> <summary> Solution: </summary>
+
+```rust
+impl QueryMsg {
+    pub fn get_validation_params(&self, api: &dyn Api) -> StdResult<(Addr, String)> {
+        match self {
+            Self::AllInfo { addr, key } => {
+                let address = api.addr_validate(addr.as_str())?;
+                Ok((address, key.clone()))
+            }
+            Self::AmIRichest { addr, key } => {
+                let address = api.addr_validate(addr.as_str())?;
+                Ok((address, key.clone()))
+            },
+        }
+    }
+}
+```
+</details>
+
+A note on the `&dyn Api` syntax:
+
+To verify that the address is in a valid format, we use `addr_validate` method of the Api trait. In order to do this, we add the `api` input field which has the type signature `&dyn Api`. If you’re unfamiliar, this is the syntax for a trait object. A trait object is a concept in Rust, and is commonly used in CosmWasm. Essentially, trait objects do not specify the required concrete type, but instead it allows the function to accept any type that implements the required trait. The concrete type can only be known at runtime. Using trait objects instead of concrete types provides more flexibility, while retaining the safety guarantees that Rust provides. One downside is that Rust’s compiler cannot check for all possible errors at compile time. Another downside is a small performance penalty, which may be significant in systems engineering but is immaterial in the context of smart contracts. If you wish to learn more, The [Rust Book](https://doc.rust-lang.org/stable/book/ch17-02-trait-objects.html) provides an in-depth explanation of trait objects.
+
+
+### Exercise: validate and handle viewing key queries
+
+Next, open the src/contract.rs file. At the query entry point function, you will find these lines of incomplete code:
+
+Here, we need to first obtain the address and viewing key from the query message. Then, we need to check if the viewing key is valid, and handle the success and error outcomes.
+
+
+```rust
+    let q_response = match msg {
+        QueryMsg::AllInfo { .. } => {
+            //
+            // complete code here
+            // 
+            ()
+        },
+        QueryMsg::AmIRichest { .. } => {
+            //
+            // complete code here
+            // 
+            ()
+        },
+        // ...
+    };
+    to_binary( /* complete code here */ "placeholder")
+```
+
+<details> <summary> Hint 1:</summary>
+
+We should utilize the method we just defined in msg.rs. 
+</details>
+
+<details> <summary> Hint 2:</summary>
+
+The ViewingKey struct has an associated function called `check` which verifies the viewing key.
+</details>
+
+
+<details> <summary> Solution: </summary>
+
+```rust
+    let q_response = match msg {
+        QueryMsg::AllInfo { .. } => {
+            let (address, validated_key) = msg.get_validation_params(deps.api)?;
+            let result = ViewingKey::check(deps.storage, address.as_str(), validated_key.as_str());
+            match result.is_ok() {
+                true => query_all_info(deps, address),
+                false => Err(StdError::generic_err("Wrong viewing key for this address or viewing key not set")),
+            }
+        },
+        QueryMsg::AmIRichest { .. } => {
+            let (address, validated_key) = msg.get_validation_params(deps.api)?;
+            let result = ViewingKey::check(deps.storage, address.as_str(), validated_key.as_str());
+            match result.is_ok() {
+                true => query_richest(deps, address),
+                false => Err(StdError::generic_err("Wrong viewing key for this address or viewing key not set")),
+            }
+        },
+        // ...
+    };
+    to_binary(&q_response?)
+```
+</details>
+
+Note that the code above has repeated parts. We wrote it this way for clarity for this lesson, but you should normally modularize your code. In this case, because both queries accept the same arguments, we can do this:
+
+```rust
+#[entry_point]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    let q_response = match msg {
+        QueryMsg::AllInfo { .. } => handle_viewing_key_query(deps, &msg, query_all_info),
+        QueryMsg::AmIRichest { .. } => handle_viewing_key_query(deps, &msg, query_richest),
+    };
+
+    to_binary(&q_response?)
+}
+
+fn handle_viewing_key_query(
+    deps: Deps,
+    msg: &QueryMsg,
+    query_fn: fn(Deps, Addr) -> StdResult<Binary>,
+) -> StdResult<Binary> {
+    let (address, validated_key) = msg.get_validation_params(deps.api)?;
+    let result = ViewingKey::check(deps.storage, address.as_str(), validated_key.as_str());
+    match result.is_ok() {
+        true => query_fn(deps, address),
+        false => Err(StdError::generic_err(
+            "Wrong viewing key for this address or viewing key not set",
+        )),
+    }
+}
+```
+
+Imagine if there were a large number of queries, consisting of non-authenticated queries, viewing key queries and permit queries. Separating these three types of queries would be immensely helpful.
+
+
+## Implementing query permits
+
+Query permits make use of digital signatures to validate a query. The account wishing to grant access creates a permit message that includes important information such as the permissions granted, tokens, and permit name. This message is signed by the account owner, creating a cryptographic digital signature that is infeasible to forge without access to the private key. This whole process is done off-chain. The permit iself is a data structure that contains the digital signature, the plaintext permit message, and the public key of the signer.
+
+When a user wishes to make a permit query, they send this permit along with the query message. The contract verifies the signature against the message and public key of the signer. If it is valid, it proceeds with the private query by executing the query message. 
+
+If you want to understand how all these work in more detail, we have an in-depth discussion in our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
+
+Now, let's implement query permits. 
+
+### Exercise: define permit query messages
+
+At this point, the only query messages the contract accepts are the two viewing key queries. Let's now define the permit query messages that our contract can accept.
+
+Add a new variant to the QueryMsg enum called `WithPermit`. It should accept two fields: `permit` and `query`.
 
 ```rust
 pub enum QueryMsg {
-    // GetCount returns the current count as a json-encoded number
-    GetCount {},
+    AllInfo { 
+        addr: Addr,
+        key: String,
+    },
+    AmIRichest {
+        addr: Addr,
+        key: String,
+    },
+    //
+    // complete code here
+    // 
 }
 ```
 
-> Enum variants look like Rust structs and in the case of `GetCount` has no data or properties associated with it.
-
-**Exercise**
-
-From the `Secret Box Workspace` terminal, try querying the counter value by sending the `GetCount` message to your contract.
-
-> While the message variants are defined in the _Secret Counter_ countract using camel-casing, all messages are actually sent in JSON
-with the message name in snake-cased.
-
-Below we're using the CLI (command-line interface) to interact with the contract. We do this by executing the `secretd` command in the docker
-container that our `LocalSecret` is running in. 
-
-```bash
-docker exec localsecret secretd query compute query $SECRET_BOX_ADDRESS '{"get_count": {}}' | jq
-```
-
-The returned value is the `CountResponse` struct with the value of the counter.
-
-```bash
-{
-  "count": 16876
-}
-```
-
-**Entry Point: Execute**
-To handle updating our counter's value we need to execute a transExercise and update our smart contract's state. The execute messages are defined as part of the `ExecuteMsg` enum:
+Additionally, we have two other enums that are incomplete. These should give you hints on what types the fields in `WithPermit` should have.
 
 ```rust
-pub enum ExecuteMsg {
-    Increment {},
-    Reset {
-      count: i32
+pub enum QueryWithPermit {
+    //
+    // complete code here
+    //
+}
+
+pub enum RichieRichPermissions {
+    //
+    // complete code here
+    //
+}
+```
+<details> <summary> Hint 1: </summary>
+The QueryWithPermit type defines the set of query messages that our contract can accept when a permit is provided. In our case, we support two query messages: AllInfo and AmIRichest. 
+</details>
+
+<details> <summary> Hint 2: </summary>
+The Permit type is a generic type that represents a permit for a specific set of permissions. We don't want the default permissions that are used for SNIPs, such as balance and history. Instead, we want our custom permissions to determine which of the two queries is allowed. We use the RichieRichPermissions enum to define this set of custom permissions that our contract supports.
+</details>
+
+<details> <summary> Solution: </summary>
+
+```rust
+pub enum QueryMsg {
+    //...
+    WithPermit {
+        permit: Permit<RichieRichPermissions>,
+        query: QueryWithPermit,
     },
+}
+
+pub enum QueryWithPermit {
+    AllInfo {  },
+    AmIRichest {  },
+}
+
+pub enum RichieRichPermissions {
+    AllInfo,
+    AmIRichest,
 }
 ```
 
-You can see that the `Increment` message has no parameters. This is because the value of our counter is always incremented by 1, so there is no need to handle user input.
+</details>
 
-```sh
-increment {} # No parameters
-```
+In our solution, RichieRichPermissions defines which of the two queries is allowed with a given permit. So, if the permit has the AmIRichest permission, the caller cannot query `am_i_richest`.
 
-The `Reset` message takes a *count* parameter, allowing us to set the count to any number we provide as a parameter. `Reset` is sent to the `execute()` entry point as:
+An alternative design is to have two variants along the lines of `AnyQuery` and `ResultOnly`. The first permission allows the caller to perform either query, while the second only allows the `am_i_richest` query. 
 
-```sh
-reset { "count": 56 } # Or any i32 value
-```
+### Exercise: handle permit queries
 
-## Setting Up Your Secret Counter
-
-In the `Secret Box Workspace` terminal, you should see the output of the tasks that store and create your contract.
-
-![](https://i.imgur.com/hQ1Bgg2.png)
-
-
-> If you've done any object-oriented programming, the idea of instantiating an object from a class definition will be familiar to you.
-
-You can think of Secret Contracts as class definitions that first need to get deployed to the blockchain. Once deployed, you can create an instance of your contract by sending
-an `InstantiateMsg` using the identifier of your deployed contract.
-
-When a contract is successfully stored on `LocalSecret`, it will be given an ID that uniquely identifies the uploaded contract.
-
-Because this is a fresh development workspace, the contract ID is assigned a value of `1` in the above message:
-
-```
-secret counter code id: 1
-```
-
-Your uploaded contract is also assigned a unique "code hash":
-
-```
-secret counter contract code hash: 0xa92402fd34057f79f7af6101d25d20c05b960ed88c82932657d87889f046d2d2
-```
-
-After it's been uploaded, it is instantiated by sending the `InstantiateMsg` with the initial value for the counter:
-
-```
-sending init message: '{"count": 16876}'
-```
-
-The result of instantiating your contract is the contract's address, which you'll use to send messages to the contract from the frontend.
-
-```
-contract address: secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg
-```
-
-Finally, the workspace stores this info as environment variable settings in the `.env` file. 
-
-```bash
-SECRET_BOX_CODE=1
-SECRET_BOX_ADDRESS=secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg
-SECRET_BOX_HASH=0xa92402fd34057f79f7af6101d25d20c05b960ed88c82932657d87889f046d2d2
-```
-
-**Exercise**
-
-Let's try to re-upload and instantiate the _Secret Counter_ contract.
-
-In the `Secret Box Workspace` terminal, run the command:
-
-```bash
-./scripts/create_secret_box.sh
-```
-
-When the script has finished, update your current environment with the latest box settings:
-
-```bash
-source .env
-echo $SECRET_BOX_CODE
-echo $SECRET_BOX_ADDRESS
-echo $SECRET_BOX_HASH
-```
-
-**Understanding Smart Contract Instantiation**
-
-Here's a breakdown of what the `instantiate()` method in your contract does:
+Now let's look at src/contract.rs. The first thing to do is to add our new variant to the match arm in the query entry point.
 
 ```rust
 #[entry_point]
-pub fn instantiate(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    msg: InstantiateMsg,
-) -> Result<Response, StdError> {
-   ...
-}
-```
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    let q_response = match msg {
+        // ...
 
-As you can see there are multiple parameters sent on the creation of a secret contract and you can find more details on these in the [CosmWasm docs](https://docs.cosmwasm.com/docs/1.0/smart-contracts/entry-points), but to summarize:
-
-- `deps: DepsMut` - contains references to your contract's `Storage`, an `Api` element that has functionality outside of the contract wasm such as the ability to
-validate, canonicalize (*binary*) and humanize (*string*) Secret Network addresses, and a `Querier` to do things like getting the balance of a wallet address.
-
-- `_env: Env` - this parameter, though unused as denoted by the `_` in front, has a `BlockInfo` element for getting the current block, `TransExerciseInfo` which has the index
-of the transExercise this `InstantiateMsg` was executed in, and `ContractInfo` which has the address of the instantiated contract.
-
-- `info` - `MessageInfo` contains the sender's address and any funds sent to the contract.
-
-- `msg` - `InstantiateMsg` this is the message defined for the creation of the contract, which in our case is an 32-bit integer named `count`.
-
-**Saving the State**
-
-The first thing our `instantiate()` method does is declare and set the values for our `State` object, which is defined in [state.rs]().
-
-You can see that the pieces of data we're storing in `State` are the initial
-counter value (`msg.count`) and the contract owner `info.sender.clone()`. 
-
-> If you're not familiar with Rust's `borrowing and referencing`, check out this [guide](https://doc.rust-lang.org/rust-by-example/scope/borrow.html), which will explain why we've had to set the `owner` to a `clone()` or copy of the sender's address.
-
-```rust
-    // Create initial state with count and contract owner
-    let state = State {
-        count: msg.count,
-        owner: info.sender.clone(),
+        //
+        // complete code here
+        // 
     };
-```
 
-The next bit of code saves the `state` to the contract's storage, prints a debug message showing who the contract was created by, in 
-the node logs, and then returns the `Ok` enum with a default response.
-
-```rust
-    // Save the contract state
-    config(deps.storage).save(&state)?;
-
-    deps.api.debug(&format!("Contract was initialized by {}", info.sender));
-
-    Ok(Response::default())
-```
-
-And in the `LocalSecret` terminal, we can see that the output from the debug message:
-
-![](https://i.imgur.com/W7rnLVd.png)
-
-**Next Steps**
-
-We'll cover the exact steps to upload and instantiate your contract as part of the next steps to evolve your _Simple Secret Counter_ DApp. We'll also flesh out the details for the query, increment and reset functions.
-
-## Querying the Counter's Value
-
-In order to get the value of the counter from the _Secret Counter_ contract, we have to code the `query_count` function. Up until this point, 
-we've had the `query_count` function return a hard-coded value:
-
-```rust
-Ok(CountResponse { count: 16876 })
-```
-
-**Exercise**
-
-Begin by opening the [contract.rs]() file, and then finding the `query()` method:
-
-```rust
-#[entry_point]
-pub fn query(
-    deps: Deps,
-    _env: Env,
-    msg: QueryMsg,
-) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
-    }
+    to_binary( /* complete code here */ "placeholder")
 }
 ```
 
-The `query` entry point is where all query messages are sent to your contract. Here you'll write a `match` statement on the message variant and call the appropriate query method in your contract.
+<details> <summary> Hint 1: </summary>
+This arm should call the `permit_queries` function. 
+</details>
 
-Notice that we are returning query results as a `Binary` type:
-
-```rust
-pub fn query(...) -> StdResult<Binary>
-```
-
-by calling `query_count` and converting the response using the `to_binary` method:
+Now let's complete the permit_queries function, which has the bulk of the logic required to process permit queries.
 
 ```rust
-to_binary(&query_count(deps)?)
-```
+fn permit_queries(deps: Deps, env: Env, permit: Permit /* add generic */, query: QueryWithPermit) -> (/* complete code here */) {
+    // Validate permit content
+    let contract_address = env.contract.address;
+        //
+        // complete code here
+        // 
 
-> We apply the `?` panic operator so that if the query returns an error, it's handled properly.
+    // Permit validated! We can now execute the query.
+        //
+        // complete code here
+        // 
 
-
-All Cosmwasm query responses are the `Binary` type, which basically takes a vector of bytes and uses base64 encoding to create a string of text. 
-Base64 encodings are also smaller than their `Binary` counterparts, which makes it more efficient to return data that way as opposed to the raw bytes.
-
-Next, we need to implement the `query_count()` method so that it returns a response with the current counter value.
-
-```rust
-fn query_count(
-    deps: Deps,
-) -> StdResult<CountResponse> {
-   // 1. load state
-   let state = config_read(deps.storage).load()?;
-
-   deps.api.debug("count incremented successfully");
-
-   // 2. return count response
-   Ok(CountResponse { count: state.count })
 }
 ```
+<details> <summary> Hint 2: </summary> The permit argument should have a generic type parameter for RichieRichPermissions. This specifies that the permit is for the RichieRichPermissions type. </details>
 
-In order to return the count of our contract, we first need to load our contract's state. The counter contract uses a Singleton type for storage of the `State` data. The `config_read()` and `config()` methods are used to read and save to the contract's state respectively. Then we create the response and return our counter's value.
+<details> <summary> Hint 3: </summary> To validate the permit content, we can use the secret_toolkit::permit::validate function. This function takes in several arguments including deps, PREFIX_REVOKED_PERMITS, &permit, contract_address.into_string(), and None. It returns the account associated with the permit if validation is successful. </details>
 
-**Exercise**
+<details> <summary> Hint 4: </summary> After the permit is validated, we can execute the query by matching on the query argument. For each variant of the QueryWithPermit enum, we need to check if the permit has the required permission using the check_permission method. If it does, we can call the appropriate query function. If it does not, we can return an error indicating that the permit does not have the required permission. </details>
 
-Substitute the code in `query_count()` for this:
 
-```rust
-   // 1. load state
-   let state = config_read(deps.storage).load()?;
-
-   deps.api.debug("count incremented successfully");
-
-   // 2. return count response
-   Ok(CountResponse { count: state.count })
-```
-
-Finally, use the `Secret Box Workspace` terminal window to compile your contract changes:
-
-```bash
-make build
-```
-
-If successful, you'll see this output:
-
-```sh
-Finished release [optimized] target(s) in 0.02s
-cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm
-cat ./contract.wasm | gzip -9 > ./contract.wasm.gz
-```
-
-**Unit Testing Your Query Message**
-
-If you scroll down to the end of the [contract.rs]() code, you'll see the unit tests. We've already
-implemented the `proper_initialization` unit test that includes a call to `query()`, passing the `QueryMsg::GetCount` 
-message.
+<details> <summary> Solution: </summary>
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn permit_queries(deps: Deps, env: Env, permit: Permit<RichieRichPermissions>, query: QueryWithPermit) -> StdResult<QueryAnswer> {
+    // Validate permit content
+    let contract_address = env.contract.address;
 
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary};
+    let account = secret_toolkit::permit::validate(
+        deps,
+        PREFIX_REVOKED_PERMITS,
+        &permit,
+        contract_address.into_string(),
+        None,
+    )?;
 
-    #[test]
-    fn proper_initialization() {
-        let mut deps = mock_dependencies();
+    // Permit validated! We can now execute the query.
+    match query {
+        QueryWithPermit::AllInfo {} => {
+            if !permit.check_permission(&RichieRichPermissions::AllInfo) {
+                return Err(StdError::generic_err(format!(
+                    "No permission to query, got permissions {:?}",
+                    permit.params.permissions
+                )));
+            }
 
-        let msg = InstantiateMsg { count: 16876 };
-        let info = mock_info("creator", &coins(1000, "earth"));
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-        let value: CountResponse = from_binary(&res).unwrap();
-        assert_eq!(16876, value.count);
-    }
-}
-```
-**Exercise**
-
-Now, that we've modified the contract to return the actual value of the counter, we can change our `proper_initialization()` unit test so that it uses a different value from the hard-coded value of `16876`.
-
-Change the `InstantiateMsg` from:
-
-```rust
-let msg = InstantiateMsg { count: 16876 };
-```
-
-to:
-
-```rust
-let msg = InstantiateMsg { count: 1000 };
-```
-
-And change the assertion statement from:
-
-```rust
-assert_eq!(16876, value.count);
-```
-
-to:
-
-```rust
-assert_eq!(1000, value.count);
-```
-
-Finally, back in your `Secret Box Workspace` terminal, run your unit tests with:
-
-```bash
-make test
-```
-
-If you've made the changes correctly, the unit test output will look like this.
-
-```sh
-Finished test [unoptimized + debuginfo] target(s) in 13.05s
-Running unittests src/lib.rs (target/debug/deps/secret_counter_vuejs_box-23b8b0115ff1a222)
-
-running 3 tests
-test contract::tests::increment ... ok
-test contract::tests::reset ... ok
-test contract::tests::proper_initialization ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-```
-
-Nicely done. If you've made it this far, you should have a good understanding of how queries work in the context of secret contracts, and you even know how to properly test your queries!
-
-## Incrementing and Reseting the Counter's Value
-
-In the following steps, we'll work on coding the functions for the `Increment` and `Reset` messages, that are routed to the `execute()` entry point of our contract: 
-
-- Increment - adds 1 to the counter
-- Reset - set the value of the counter to _count_
-
-You'll notice we've already completed the `match` statement for two `ExecuteMsg` variants:
-
-```rust
-#[entry_point]
-pub fn execute(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    msg: ExecuteMsg,
-) -> Result<Response, ContractError> {
-    match msg {
-        ExecuteMsg::Increment {} => try_increment(deps),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
-    }
-}
-```
-
-**Exercise**
-
-Find the `try_increment` function and change the code from this:
-
-```rust
-pub fn try_increment(
-    deps: DepsMut,
-) -> Result<Response, ContractError> {
-
-    // 1. load state
-    // 2. increment the counter by 1
-    // 3. save state
-
-    deps.api.debug("count incremented successfully");
-    Ok(Response::default())
-}
-```
-
-to:
-
-```rust
-pub fn try_increment(
-    deps: DepsMut,
-) -> Result<Response, ContractError> {
-
-    // Update state, incrementing counter by 1
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
-
-    deps.api.debug("count incremented successfully");
-    Ok(Response::default())
-}
-```
-
-> Notice that we're able to load and update the state in one statement above. For more information on working with 
-storage, check out the [Secret CosmWasm storage docs](https://docs.scrt.network/secret-network-documentation/development/secret-contracts/contract-components/storage).
-
-
-**Exercise**
-
-Find the `try_reset` function and change it from this:
-
-```rust
-pub fn try_reset(
-    deps: DepsMut,
-    info: MessageInfo,
-    count: i32,
-) -> Result<Response, ContractError> {
-
-    // 1. load state
-    // 2. if sender is not the contract owner, return error
-    // 3. else, reset the counter to the value given
-
-    deps.api.debug("count reset successfully");
-    Ok(Response::default())
-}
-```
-
-to:
-
-```rust
-pub fn try_reset(
-    deps: DepsMut,
-    info: MessageInfo,
-    count: i32,
-) -> Result<Response, ContractError> {
-
-   // Update state, setting counter to value
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
+            query_all_info(deps, deps.api.addr_validate(&account)?)
         }
-        state.count = count;
-        Ok(state)
-    })?;
+        QueryWithPermit::AmIRichest {  } => {
+            if !permit.check_permission(&RichieRichPermissions::AmIRichest) {
+                return Err(StdError::generic_err(format!(
+                    "No permission to query, got permissions {:?}",
+                    permit.params.permissions
+                )));
+            }
 
-    deps.api.debug("count reset successfully");
-    Ok(Response::default())
-}
-```
-
-When calling `update`, we're checking to make sure that the sender of the message is also the contract
-owner because in our design we've decided that the `reset` transExercise is something only the contract owner
-should be able send.
-
-In the event that the caller of `reset` is *not* the contract owner, we return a `ContractError` enum variant stating the sender is unauthorized. 
-
-> The [error.rs]() file is a great spot to put all of your contract-specific errors for the `execute` messages.
-
-**Unit Testing Your Increment and Reset Messages**
-
-Yay! Now we're ready to add unit tests for the `ExecuteMsg::Increment` and `ExecuteMsg::Reset` message variants.
-
-**Exercise**
-
-Change the increment and reset unit test functions from:
-
-```rust
-#[test]
-fn increment() {
-    assert!(true);
-}
-
-#[test]
-fn reset() {
-    assert!(true);
-}
-```
-
-to:
-
-```rust
-#[test]
-fn increment() {
-    let mut deps = mock_dependencies();
-
-    let msg = InstantiateMsg { count: 17 };
-    let info = mock_info("creator", &coins(2, "token"));
-    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    // anyone can increment
-    let info = mock_info("anyone", &coins(2, "token"));
-    let msg = ExecuteMsg::Increment {};
-    let _res = execute(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    // should increase counter by 1
-    let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-    let value: CountResponse = from_binary(&res).unwrap();
-    assert_eq!(18, value.count);
-}
-
-#[test]
-fn reset() {
-    let mut deps = mock_dependencies();
-
-    let msg = InstantiateMsg { count: 17 };
-    let info = mock_info("creator", &coins(2, "token"));
-    let _res = instantiate(deps.as_mut(), mock_env(), info, msg).unwrap();
-
-    // not anyone can reset
-    let unauth_env = mock_info("anyone", &coins(2, "token"));
-    let msg = ExecuteMsg::Reset { count: 5 };
-    let res = execute(deps.as_mut(), mock_env(), unauth_env, msg);
-    match res {
-        Err(ContractError::Unauthorized {}) => {}
-        _ => panic!("Must return unauthorized error"),
+            query_richest(deps, deps.api.addr_validate(&account)?)
+        }
     }
-
-    // only the original creator can reset the counter
-    let auth_info = mock_info("creator", &coins(2, "token"));
-    let msg = ExecuteMsg::Reset { count: 5 };
-    let _res = execute(deps.as_mut(), mock_env(), auth_info, msg).unwrap();
-
-    // should now be 5
-    let res = query(deps.as_ref(), mock_env(), QueryMsg::GetCount {}).unwrap();
-    let value: CountResponse = from_binary(&res).unwrap();
-    assert_eq!(5, value.count);
 }
 ```
-**Exercise** 
+</details>
 
-Now, let's compile the contract and, if successful, run the units tests.
 
-```bash
-make build && make test
-```
+## Redeploying contract
 
-**Build and Unit Test Log**
+Our contract is now complete. Let's make sure it compiles, then redeploy it to our local blockchain. In your second terminal, run the following commands:
 
-```bash
-RUSTFLAGS='-C link-arg=-s' cargo build --release --target wasm32-unknown-unknown
-   Compiling secret-counter-vuejs-box v0.1.0 (/home/lori/source/repos/secret-counter-vuejs-box)
-    Finished release [optimized] target(s) in 2.42s
-cp ./target/wasm32-unknown-unknown/release/*.wasm ./contract.wasm
-cat ./contract.wasm | gzip -9 > ./contract.wasm.gz
-cargo unit-test
-    Finished test [unoptimized + debuginfo] target(s) in 13.05s
-     Running unittests src/lib.rs (target/debug/deps/secret_counter_vuejs_box-23b8b0115ff1a222)
+```sh
+# optional first line
+cargo check && make test
 
-running 3 tests
-test contract::tests::increment ... ok
-test contract::tests::reset ... ok
-test contract::tests::proper_initialization ... ok
+# compile and compress the contract into a wasm bytecode
+make build
 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-```
-
-## Deploying the Secret Counter Contract
-
-Now that you've got all of your contract's functionality implemented, and the unit tests are passing, it's time to re-compile and
-deploy the revised version of your _Secret Counter_ contract.
-
-Use the `Secret Box Workspace` terminal to run the following command:
-
-```bash
+# run the shellscript to upload and instantiate an updated contract
 ./scripts/create_secret_box.sh
 ```
-> The `create_secretbox.sh` script compiles the contract, uploads it to `LocalSecret` and then saves the contract ID, hash and address to 
-`.env` files to be used in your `Secret Box Workspace` terminal, the integration tests, and the `Simple Secret Counter` frontend.
 
-## Running the Integration Tests
-
-Now that you've got all of your contract's functionality implemented, and the unit tests are passing, it's time to
-run the integration tests. These tests are written using [TypeScript](https://www.typescriptlang.org/) and [Secret.js](https://secretjs.scrt.network/), which is the library that you'll use to 
-connect to `LocalSecret` and run your queries and transExercises.
-
-> Writing integration tests is an important exercise as it involves having an external process interact with your contract. It's also helpful 
-when it comes time to develop the frontend of a DApp because it provides the examples of sending the query and execute messages to your 
-contract.
-
-**Exercise**
-
-In the `Secret Box Workspace` terminal window, run these commands:
-
-```bash
-cd tests
-npx ts-node secretbox.ts
-```
-> As the test is running you'll start to see the activity in the `LocalSecret` terminal, as the integration tests.
-
-![](https://i.imgur.com/MYhruE5.png)
-
-The `secretbox.ts` perform these steps in order:
-
-- initializes the *Secret.js* client
-- queries the counter for its initial value
-- increments the counter and queries the new value to verify it was incremented by `1`
-- resets the counter to `56` and verifies by doing another counter query
-
-Congratulations! You've successfully completed your first secret contract with both unit and integration tests.
-
-**Next Steps**
-
-In the next part of this tutorial, we'll modify the _Simple Secret Counter_ DApp to:
-
-- get the actual counter value from the contract
-- code the calls to the contract to increment and reset the counter 
-
-Basically, you'll be connecting the frontend to your backend contract using the `Secret.js` client, a privacy-preserving Web3 library for Secret Network.
-
-## Revising the Secret Counter Frontend
-
-You might have noticed that when the _Secret Counter Box_ was launched, at the end of that process, you DApp or frontend was displayed in the browser window, 
-with an initial counter value of _0_. 
-
-> We'll be using [Secret.js](https://secretjs.scrt.network/) to interact with the contract. The docs cover the breadth of everything you can do with
-> `secretjs` and we recommend taking a look at that information as you go through this tutorial.
-
-At this point, the `SecretBox.vue` component has a hard-coded value of _0_ for the initial and reset value for the counter. 
-
-**Exercise**
-
-Go ahead and try out the counter now, clicking the _+_ button, and then click on the _Reset Counter?_.
-
-### Add the Secret Network Client and Wallet
-
-> You'll notice that the incrementing and resetting happens very quickly. After you've "wired" your frontend to the backend contract, it won't be
-> as quick because the `localsecret` blockchain has a block time of approximately 5-6s, which is how long it takes to get your `increment` and 
-> `reset` transExercises included in the next block that's committed to the network.
-
-![](https://i.imgur.com/SDjq1Hv.png)
-
-Now, let's modify the [SecretBox.vue]() component so that it:
-
-- imports the `Wallet` and `SecretNetworkClient` modules
-- defines the `secretjs` client variable that we'll use to establish a connection with our `localsecret` environment
-- creates a _secret_ `Wallet` with the mnemonic that corresponds to one of the pre-defined [accounts](https://docs.scrt.network/secret-network-documentation/development/tools-and-libraries/local-secret#accounts) that `localsecret` comes with out of the box
-- sets up our secret box environment variables for the identifier, contract hash value, and the contract address
-
-> The _Simple Secret Counter_ frontend uses the settings published to `app/.env` to interact with the contract.
+> **Stuck? Tests failing? Not compiling?** 
 >
-> The Vite frontend server automatically reads the `.env` file and makes environment variables prefixed with `VITE_` available to your frontend client via the `import.meta.env` object.
-> ```bash
-> VITE_SECRET_BOX_CODE=1
-> VITE_SECRET_BOX_ADDRESS=secret18vd8fpwxzck93qlwghaj6arh4p7c5n8978vsyg
-> VITE_SECRET_BOX_HASH=0xa92402fd34057f79f7af6101d25d20c05b960ed88c82932657d87889f046d2d2
-> VITE_LOCALSECRET_GRPC=https://9091-secretunive-secretcount-j7shljm3sni.ws-us77.gitpod.io
-> ```
+> The complete contract and front-end app code can be found in the app/solutions folder.
 
-**Exercise**
 
-Change the following code at the top of [SecretBox.vue]():
+The shellscript additionally changes the environment variables, such as SECRET_BOX_ADDRESS. By doing this, our front end will interact with the new contract.
 
-```typescript
-<script setup lang="ts">
-import { onMounted, ref } from 'vue'
+**(Optional)** You can interact with the contract using secretcli if you want. For example, you can have two users input their networth and perform a viewing key query. 
+
+```sh
+# get the new environment variables
+source .env
+
+# execute messages using the secretcli binary in our docker file
+# submit networth for user `a` 
+docker exec localsecret secretcli tx compute execute $SECRET_BOX_ADDRESS '{"submit_net_worth":{"networth":"100"}}' --from a -y
+
+
+# submit networth for user `b` 
+docker exec localsecret secretcli tx compute execute $SECRET_BOX_ADDRESS '{"submit_net_worth":{"networth":"500"}}' --from b -y
+
+
+# set viewing key for user `a`
+docker exec localsecret secretcli tx compute execute $SECRET_BOX_ADDRESS '{"set_viewing_key":{"key":"super_secret_key"}}' --from a -y
+
+# perform viewing key query for user `a`
+USER_A=$(docker exec localsecret secretcli keys show --address a)
+
+docker exec localsecret secretcli q compute query $SECRET_BOX_ADDRESS '{"all_info":{"addr":"'"$USER_A"'", "key":"super_secret_key"}}'
 ```
 
-to:
+You should see something like this:
+```bash
+{"AllInfo":{"richest":false,"networth":"100"}}
+```
 
-```typescript
-<script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { Wallet, SecretNetworkClient } from "secretjs"
 
-// Secret.js Client
-let secretjs: SecretNetworkClient
 
-const wallet = new Wallet(
-  "grant rice replace explain federal release fix clever romance raise often wild taxi quarter soccer fiber love must tape steak together observe swap guitar"
-)
+## Revising the frontend
 
+Let's now switch over to the frontend webapp. 
+
+This part of the tutorial will focus on how to use secret.js to:
+- integrate a frontend app with a Secret smart contract 
+- allow users to create and sign permits
+
+In this box, we use Vue.js as our web development framework. However, our focus is on secret.js. The secret.js code should be similar, if not identical, regardless of which web framwork you choose to use. The exercises below don't cover specific Vue.js concepts, but all the source code is available for you to view for you to understand how it all sticks together. You can then apply the same logic to your preferred web framework.
+
+
+### Exercise: initialize secret.js client
+
+First, navigate to the app/src/components/SecretBox/ContractApi.ts file. This file contains all the functions related to interacting with our RichieRich smart contract. It is imported by the SecretBox.vue component, and you can see the SecretBox component is used in the App.vue top-level parent component. 
+
+Your task is to complete the code to initialize the secret.js Secret Network client. The code here would be similar to what you do in Secret Counter Box, which is an introductory box. SecretNetworkClient is a class that contains account information and useful methods for performing transactions, queries and so on.
+
+
+```ts
+export const initSecretjsClient = async (accounts: SecretNetworkClient[]) => {
+  //
+  // complete code here
+  //
+  return accounts
+}
+```
+
+<details> <summary> Hint 1: </summary>
+
+You can initialize SecretNetworkClient like you would with any class in javascript/typescript:
+
+```ts
+new SecretNetworkClient({ ... })
+```
+
+The values of the fields to initialize it with is imported at the top of the file from the .env file we populated when we ran the create_secret_box.sh script. For example, localSecretUrl takes a value from the environment variables.
+
+```ts
 // Get environment variables from .env
-const localSecretUrl = import.meta.env.VITE_LOCALSECRET_GRPC
-const secretBoxCode = import.meta.env.VITE_SECRET_BOX_CODE
-const secretBoxHash = import.meta.env.VITE_SECRET_BOX_HASH
-const secretBoxAddress = import.meta.env.VITE_SECRET_BOX_ADDRESS
-
-console.log(`local gRPC = ${localSecretUrl}`)
-console.log(`code id = ${secretBoxCode}`)
-console.log(`contract hash = ${secretBoxHash}`)
-console.log(`contract address = ${secretBoxAddress}`)
+const localSecretUrl: string = import.meta.env.VITE_LOCALSECRET_LCD
 ```
+</details>
 
+### Exercise: define contract api
 
-If you open the browser Dev Tools window (Ctrl+Shift+I), you should see the console log messages from above. 
+In the same file (ContractApi.ts), you will see the functions for each message we can send to the contract. 
 
-![](https://i.imgur.com/bUSD7p3.png)
+Complete the code for these functions.
 
-### Connect to LocalSecret
-
-At this point we haven't actually connected to the `localsecret` network yet. Let's do that next.
-
-**Exercise**
-
-Change the `onMounted()` function from:
-
-```typescript
-onMounted(async () => {
-  window.addEventListener('scroll', handleScroll)
-})
-```
-
-to:
-
-```typescript
-onMounted(async () => {
-  window.addEventListener('scroll', handleScroll)
-
-  // To create a signer secret.js client, also pass in a wallet
-  console.log("Initializing Secret.js client ...")
-  secretjs = await SecretNetworkClient.create({
-    //grpcWebUrl: "http://localhost:9091",
-    grpcWebUrl: localSecretUrl,
-    chainId: "secretdev-1",
-    wallet: wallet,
-    walletAddress: wallet.address,
+```ts
+export const handleSubmitNetworth = async (
+  secretjs: SecretNetworkClient,
+  networth: string
+) => {
+  const tx = await secretjs.tx.compute.executeContract(
+  {
+    sender: secretjs.address,
+    contract_address: secretBoxAddress,
+    code_hash: secretBoxHash,
+    msg: {
+      //
+      // complete code here
+      //
+    },
+  },
+  {
+    gasLimit: 1_000_000,
   })
 
-  console.log(`Created client for wallet address: ${wallet.address}`)
-
-  count.value = await queryCounter()
-})
-```
-
-In the code above, we're creating a client for `localsecret` using the wallet we setup. Once the DApp has connected to the network, you're ready
-to start making queries and sending transExercises to the _Secret Counter_ contract.
-
-> We're using the cloud-based Gitpod URL in the workspace, to talk to the `LocalSecret` blockchain, which runs on port 9091. If you're working with this _Secret Box_ in a local developer environment, change that to the line above `grpcWebUrl: "http://localhost:9091` instead.
-
-### Query the Counter Value
-
-At the end of the `onMounted` function above, you'll notice that as the last task we're calling the `queryCounter()` function to display
-the initial value. But, it's not actually sending the query to your contract yet.
-
-**Exercise**
-
-Change the `queryCounter() function from:
-
-```typescript
-const queryCounter = () => {
-  return count.value
+  console.log("Submitted networth")
 }
 ```
 
-to:
+<details> <summary> Hint 1: </summary>
 
-```typescript
-const queryCounter = async () => {
-  type CountResponse = { count: number }
+The message schema should match exactly with our contract. Recall we defined the valid messages in the msg.rs file of our contract. We wrote the variant names in CamelCase in Rust, but they should be in snake_case in typescript. This is because we converted them to snake_case when we serialized them:
 
-  const response = (await secretjs.query.compute.queryContract({
-    contractAddress: secretBoxAddress,
-    codeHash: secretBoxHash,
-    query: { get_count: {} },
-  })) as CountResponse;
+```rust
+// we had this macro in our contract to serialize our messages to snake_case
+#[serde(rename_all = "snake_case")]
+```
 
-  if ('err"' in response) {
-    throw new Error(
-      `Query failed with the following err: ${JSON.stringify(response)}`
-    )
+Additionally, the exact type syntax differs between Rust and Typescript. Note that CosmWasm's `Uint128` would correspond to a Typscript `string`, not `number`. However, we have already written this for you in the function input signatures. 
+
+</details>
+
+<details> <summary> Solution: </summary>
+
+`handleSubmitNetworth` should have the following code. You need to do the same for the other functions, based on the valid messages we defined in msg.rs.
+
+```ts
+export const handleSubmitNetworth = async (
+  secretjs: SecretNetworkClient,
+  networth: string
+) => {
+  const tx = await secretjs.tx.compute.executeContract(
+  {
+    sender: secretjs.address,
+    contract_address: secretBoxAddress,
+    code_hash: secretBoxHash,
+    msg: {
+      submit_net_worth: { networth },
+    },
+  },
+  {
+    gasLimit: 1_000_000,
+  })
+
+  console.log("Submitted networth")
+}
+```
+</details>
+
+
+### Exercise: create permit
+
+Remember that permits are signed off-chain. This means it is critical for us create a frontend to sign permits. The ContractApi.ts file also includes the function for this.
+
+Navigate to the bottom of the file and complete the code to generate permits:
+
+```ts
+export async function handleGeneratePermit(
+  account: SecretNetworkClient,
+  permitName: string,
+  permissions: CustomPermission[],
+): Promise<Permit> {
+    //
+    // complete code here
+    //
+  // @ts-ignore
+  const permit = "placeholder" as Permit
+
+  console.log(`Generated permit for ${account.address}`)
+
+  return permit;
+}
+
+```
+
+
+<details> <summary> Hint 1: </summary>
+
+SecretNetworkClient has a method to sign permits: 
+
+```ts
+SecretNetworkClient.utils.accessControl.permit.sign(
+```
+
+Secret.js defines the `sign` function this way:
+
+```ts
+  sign(
+    owner: string,
+    chainId: string,
+    permitName: string,
+    allowedContracts: string[],
+    permissions: Permission[],
+    keplr: boolean = true,
+  ): Promise<Permit> {
+    this._checkSigner();
+
+    return newPermit(
+      //@ts-ignore
+      this.signer,
+      owner,
+      chainId,
+      permitName,
+      allowedContracts,
+      permissions,
+      keplr,
+    );
   }
+```
+</details>
 
-  return response.count
+<details> <summary> Hint 2: </summary>
+
+We need to use RichieRich's custom permissions for this permit. Recall the custom permissions were defined in the contract as:
+
+```rust
+pub enum RichieRichPermissions {
+    AllInfo,
+    AmIRichest,
 }
 ```
 
-To send a query message to your contract, you specify the contract's address and it's hash (this is optional, but faster if you include the contract hash). 
-Remember that we defined a `QueryCount` message for the contract and the way to send that is to convert it to it's snake case equivalent:
+We already defined the same custom permission in our SecretBox component's Types.ts file:
 
-```typescript
-GetCount: { }
+```ts
+export type CustomPermission = "all_info" | "am_i_richest" | ""
 ```
 
-is called from the DApp as:
+CustomPermission type is already in the function input signature.
 
-```typescript
-get_count: { }
-```
+</details>
 
 
-> Remember that the `secret counter` contract was instantiated with an initial value of `16876`.
+<details> <summary> Solution: </summary>
 
-and back in the _Simple Counter_ frontend, you'll see it's picking up the actual counter value. We're on our way now!
+```ts
+export async function handleGeneratePermit(
+  account: SecretNetworkClient,
+  permitName: string,
+  permissions: CustomPermission[],
+): Promise<Permit> {
+  const permit = await account.utils.accessControl.permit.sign(
+    account.address,
+    "secret-4",
+    permitName,
+    [secretBoxAddress],
+    // @ts-ignore
+    permissions, // ["owner"],
+    false,
+  );
 
-![](https://i.imgur.com/Ll0i2fx.png)
+  console.log(`Generated permit for ${account.address}`)
 
-### Increment the Counter
-
-If you click the _+_ button to increment the counter, you'll notice that the counter is incremented, but if you reload the page, the counter value
-that's displayed is still `16876`. That's because we haven't modified the `increment()` function to send the transExercise to `LocalSecret`. The counter 
-value stored in the contract's state has not been changed yet.
-
-**Exercise**
-
-Change the `incrementCounter()` function from:
-
-```typescript
-const incrementCounter = () => {
-  count.value++
+  return permit;
 }
+
 ```
 
-to:
+</details>
 
-```typescript
-const incrementCounter = async () => {
-  const tx = await secretjs.tx.compute.executeContract(
-  {
-    sender: wallet.address,
-    contractAddress: secretBoxAddress,
-    codeHash: secretBoxHash,
-    msg: {
-      increment: {},
-    },
-  },
-  {
-    gasLimit: 1_000_000,
-  })
+## Using the front-end app
 
-  console.log("Increment by 1")
-  count.value = await queryCounter()
-}
-```
+- At this point your front end app should look like this: ![screenshot](./illustrations/richierich-app-screenshot.png)
 
-In the code above, we send a transExercise that updates the contract's state by calling `secretjs.tx.compute.executeContract()`, supplying:
+The app is designed to help developers understand how viewing keys and permits work by interacting with a graphical user interface (GUI). The GUI is divided into two sections:
+- Account-level messages
+- Query messages
 
-- sender's wallet address
-- contract address
-- contract hash
-- the `Increment` message
-- the gas limit for our transExercise sets a "meter" to limit the amount of gas paid for in fees
+The first section, account-level messages, are for execute messages (on-chain) and permit generation (off-chain). There are four sub-sections, each specific to one of the four accounts we created in our `SecretNetworkClient` initialization.
 
-After the `increment` transExercise is executed in a block, we do another `queryCounter()` call to get the changed value.
+To submit net worth, enter a number in the first box and click the “Submit Networth” button. To set a viewing key, type any string as the viewing key and click “Set viewing key”. You will need to remember this key for later use.
 
-**Exercise**
+To generate a permit, enter any string as the permit name and enter the permission which should be either `all_info` or `am_i_richest`. Recall that these are our two custom permissions that we defined. Generating permits is done by the front-end app with no interaction with the contract. If successful, you will see the newly generated permit added to the list of permits towards the bottom of the app. We index each permit generated with an integer; the first permit you generate should be numbered `1`. This is for convenience when you later perform query permits. Instead of typing the entire permit JSON, you only need to specify the index and the app pulls the correct permit to send with the query.
 
-Now, try incrementing the counter and you should see the counter value has now changed.
+The contract only accepts one round. Once two players have submitted their networth, the contract will reject any further networth inputs. If you want to play another round, you can redeploy a new contract by running either script below:
 
-> Because we're now connected to the `localsecret` blockchain, there's a slight delay between clicking the increment button, and the changed value
-> in the frontend.
+```sh
+# run the shellscript that deploys a new contract and sets the environment variables to point to this new contract 
+./scripts/create_secret_box.sh
 
-### Reset the Counter
+# does the exact same thing, but using the Makefile script we've defined
+make deploybox
+``` 
 
-At this point, since we haven't modified the `resetCounter()` function when you click the _Reset Counter?_ button, you'll see the value is reset
-to _0_, but reloading the page will show that the counter is still at the last incremented value.
 
-**Exercise**
+The second section, queries, are for performing viewing key or permit queries, and then viewing the results. These are not account-specific, as contracts cannot verify the caller for queries securely (otherwise there may not be a need for viewing keys in the first place). The query section represents “any” party who wishes to send a query message.
 
-Change the `resetCounter()` function from:
+To perform a viewing key query, enter one of the four public addresses in the first field (e.g., `secret1ap26qrlp8mcq2pg6r47w43l0y8zkqm8a450s03`) and the viewing key that you created earlier for that specific account. When you click one of the buttons “VK Query: All Info” or “VK Query: Am I Richest”, you will see the result of your query appear at the box at the bottom of the app. Viewing keys will work for both query messages.
 
-```typescript
-const resetCounter = () => {
-  count.value = 0
-}
-```
+To perform a permit query, enter the index of the permit you created (e.g. try inputting `1` or `2`) and click either of the two "Permit Query" buttons. If the permit has the correct permission for the query type, you will see the result at the bottom box. If the permission is wrong, there will be an error. As you can see, standard implementations for permits allow more fine-grained access control. Note that you also don’t need to enter the address of the account you wish to query because the permit itself already contains the public address of the signer.
 
-to:
 
-```typescript
-const resetCounter = async () => {
-  const tx = await secretjs.tx.compute.executeContract(
-  {
-    sender: wallet.address,
-    contractAddress: secretBoxAddress,
-    codeHash: secretBoxHash,
-    msg: {
-      reset: { count: 56 },
-    },
-  },
-  {
-    gasLimit: 1_000_000,
-  })
+> **Is it possible to improve the user experience by allowing more than one round?**
+> Yes, it is possible. If you are interested, you can improve the contract such that after taking two inputs, another round begins. You can even allow multiple rounds to run concurrently. Doing this does not increase or decrease the severity of the vulnerability described earlier. It is not difficult to implement these changes; it just requires more lines of code. It is not required for our purposes though, as we can easily instantiate new contracts each time we wish to start a new round.
 
-  console.log("Counter reset")
-  count.value = await queryCounter()
-}
-```
+> **Additional exercise: revoking permits**
+>
+> Notice that we do not have a revoke permit functionality in this Secret Box. A bonus exercise is to implement this functionality in this contract. We describe the steps on how to do this in our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
 
-The `resetCounter()` function is pretty much the same except that we're sending a `count` value of `56` to the contract.
 
-Try clicking the _Reset Counter?_ button. 
-
-> Notice that the `resetCounter()` function is sending the "reset" message with a value of `56` and the frontend should now be displaying that value.
-
-![](https://i.imgur.com/ahBdkLp.png)
-
-Congratulations on completing this introductory _Secret Counter Box_ tutorial!
+Congratulations on completing this tutorial!
 
 We at [Secret University](https://scrt.university) hope you've not only enjoyed working through the **Exercise** steps, but that you've also learned a bit of what Secret Contracts are all about.
 
 ## Further Reading
 
-- After going through this tutorial, we encourage you to go through this [Getting Started Guide](https://docs.scrt.network/secret-network-documentation/development/getting-started) for further learning on secret contracts and a breakdown on the Secret Millionaires' Problem contract.
+- Our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits) discusses authenticated queries in detail. 
 
 - If you're new to the Rust programming language, check out the [Rust Book](https://doc.rust-lang.org/book/) or the [Rustlings](https://github.com/rust-lang/rustlings) course.
 
@@ -999,3 +759,11 @@ We at [Secret University](https://scrt.university) hope you've not only enjoyed 
     - [Learn Typescript](https://www.typescriptlang.org/docs)
 
 
+
+> **What's the issue with this simple implementation?**
+> 
+> Our focus with RichieRich is to demonstrate viewing keys and permits. So these parts are secure. However, the core contract itself has a critical privacy vulnerability. A side channel attack can reveal the networth of the other user. 
+>
+> Let's start with the most naive implementation of all, where two users submit their networth, and are able to revise their inputs any time. Suppose one user (Alice) has submitted her networth, then the other user (Bob) can submit “dummy” inputs starting from 0 SCRT and progressively increment the amount until he sees the result switch from is_richest == False to is_richest == True. This effectively reveals Alice’s exact networth. Notice that Alice can also perform the same attack on Bob, assuming that Bob does not perform the attack first.  
+>
+> This attack cannot be done on the RichieRich contract, as it only allows one input per user. Once it accepts two user inputs, it stops accepting anything else. This prevents someone from entering values arbitrarily as described above. However, this exact attack can still be performed by the second user, by utilizing a side channel. Bob could create many forks of the mainnet and try different networth inputs on each, until he determines Alice’s exact networth. While this attack is more complex and only compromises the first user, it is still relatively trivial for a determined attacker. This vulnerability is also described in the Secret docs’ [description of some vulnerabilities](https://docs.scrt.network/secret-network-documentation/overview-ecosystem-and-technology/techstack/privacy-technology/theoretical-attacks#more-advanced-tx-replay-attacks-search-to-decision-for-millionaire-s-problem).

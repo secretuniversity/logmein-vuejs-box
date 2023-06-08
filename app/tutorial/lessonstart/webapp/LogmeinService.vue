@@ -54,7 +54,6 @@ async function queryAuthKey() {
 }
 
 async function lmiSign() {
-  // const privKey = ed.utils.randomPrivateKey(); // Secure random private key
   const privKey = await queryAuthKey()
 
   if (typeof privKey === 'undefined') {
@@ -62,7 +61,11 @@ async function lmiSign() {
   } 
 
   const message = Uint8Array.from([0xab, 0xbc, 0xcd, 0xde]);
-  const signature = await ed.signAsync(message, Uint8Array.from(privKey));
+
+  //
+  // edit code below
+  //
+  const signature = message
 
   console.log(`created signature: ${signature}`)
   console.log(`the public key should be ${await ed.getPublicKeyAsync(Uint8Array.from(privKey))}`)
@@ -79,7 +82,11 @@ async function verifySignature(
   message: Uint8Array, 
   pubKey: Uint8Array
 ) {
-  const isValid = await ed.verifyAsync(signature, message, pubKey);
+  //
+  // edit code below
+  //
+
+  const isValid = true
   return isValid
 }
 
@@ -89,14 +96,9 @@ const verifyLogin = async (
   console.log(`verifying login for token_id: ${loginRequest.tokenId}; with signature: ${loginRequest.signature}; message: ${loginRequest.message}`)
   const pubKey = await queryPubKey(props.accounts[0], loginRequest.tokenId)
   if (pubKey !== undefined ) {
-    const isValid = await verifySignature(
-      loginRequest.signature,
-      loginRequest.message,
-      Uint8Array.from(pubKey),
-    )
-    console.log(`checked signature valid: ${isValid}`)
-    loginAttemptResult.value = isValid
-    return isValid
+    //
+    // complete code here
+    //
   } else {
     throw Error("failed to verify signature: could not determine if valid or not")
   }
@@ -110,7 +112,9 @@ async function onButtonClicked() {
   loginAttemptResult.value = false
 
   // LMI generates signature
-  loginRequest = await lmiSign()
+  //
+  // complete code here
+  //
 
   // Third Party App verifies siganture
   verifyLogin(loginRequest)
