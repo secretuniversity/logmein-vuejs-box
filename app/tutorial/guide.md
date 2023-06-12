@@ -8,6 +8,16 @@ We would like to note that using cryptography at the contract level can be compl
 
 You can work through this Secret box using either Gitpod or your local environment. If you prefer to use your local environment, you can follow the “Getting Started” steps in the [README of this repo](https://github.com/secretuniversity/logmein-vuejs-box/blob/main/README.md) to set everything up.
 
+## Prerequisites
+
+We assume you are familiar with building simple Secret contracts, including implementing viewing keys and permits. If not, we've got you covered with our [RichieRich Secret Box](TBC) and [Viewing Key and Permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
+
+An addition, we assume you have basic conceptual understanding of the role of private and public keys in assymetric cryptography. We are not saying that you need to understand the math behind it, though. If you have spent any time in blockchain, you would be familiar with private and public keys -- a non-technical user will be familiar with the public key as it is sometimes referred to as the "account address" that anyone can view. The private keys are the things you should never share with anyone, and the thing that crypto scammers are always after! 
+
+The point is private keys can cryptographically sign messages, which can be verified using the correspending public key. If the verification passes, as long as the signer is the only party possessing the private key, we can be confident that the signed message had indeed originated from the intended sender (not forged) and the message content had not been tempered with. If you understand this conceptually, it's enough to follow our tutorial.
+
+We also use a similar design for the front end as we did with other more basic boxes. It might be worth looking at RichieRich for example, to understand how we implemented permit creation, which is done by the front end application.
+
 ## Contract overview
 
 In our box, we have these hypothetical services:
@@ -66,7 +76,7 @@ As a modified NFT, a logical first step is to fork the SNIP721 reference impleme
 There are probably more scalable ways than forking the SNIP721 reference contract, such as importing the SNIP721 contract or creating a mod. However, that is beyond the scope of this Secret Box.
 
 
-## Exercise: Defining the GenerateKeypairs message
+### Exercise: Defining the GenerateKeypairs message
 
 Our modified SNIP721 needs to accept an execute message with this JSON schema:
 
@@ -98,7 +108,7 @@ pub enum ExecuteMsg {
 ```
 </details>
 
-## Exercise: Adding keypair to the Extension struct
+### Exercise: Adding keypair to the Extension struct
 
 Next let's modify the token. In the token.rs file, we define the `Token` struct, which stores important information about the token. We also define the Metadata struct, which has all the information that can be stored in the token's metadata. These are part of the standard SNIP721 implementation. Notice Metadata has a field called extension, which stores on optional Extension type. In the Extension struct, let's add the ability to store the keypair required for Logmein. Let's call the field `auth_key`. This should be a 32-byte array, which represents a 256-bit number. Note a byte can be represented by a u8 type.
 
@@ -114,7 +124,7 @@ pub struct Extension {
 ```
 </details>
 
-## Exercise: defining a method to add auth_key
+### Exercise: defining a method to add auth_key
 
 We want the Metadata type to have a method called `add_auth_key` which accepts a 32-byte array and makes that the token's auth_key. It should not modify any existing information in the token's metadata. 
 
@@ -149,7 +159,7 @@ impl Extension {
 ```
 </details>
 
-## Exercise: handling the GenerateKeypairs execute message
+### Exercise: handling the GenerateKeypairs execute message
 
 In the execute entry point function, we need to handle the new variant we defined in ExecuteMsg. Add that in the match arm of the execute entry point function.
 
@@ -182,7 +192,7 @@ We have a total of four new functions in contract.rs to handle generating keypai
 >
 > Generating numbers fully on-chain is challenging to do in a secure way. Even with the ability to have a hidden prng_seed does not solve problems for all use cases. For this use case, generating random numbers like this is mostly secure. For most other applications, we recommend using Secret Networks VRF.
 
-## Exercise: authenticating the caller
+### Exercise: authenticating the caller
 
 We have defined the error message. Your task is to write the logic that authenticates the message sender. The rule is to allow the following addresses to proceed:
 - token_id owner 
@@ -204,7 +214,7 @@ We have defined the error message. Your task is to write the logic that authenti
 </details>
 
 
-## Exercise: using prng_seed to call generate_keypair
+### Exercise: using prng_seed to call generate_keypair
 
 Navigate to the metadata_generate_keypair_impl function. Notice there are three blocks of code to complete. Let's start with the first block, which should call the generate_keypair function using the prng_seed as input.
 
@@ -238,7 +248,7 @@ pub fn instantiate(
 ```
 </details> 
 
-## Exercise: updating the metadata
+### Exercise: updating the metadata
 
 Now that we have the public and private keys, we need to update the NFT's metadata. Your task is to write the code for this.
 
@@ -316,7 +326,7 @@ pub fn instantiate(
 ```
 </details> 
 
-## Exercise: generating the ed25519 keypair
+### Exercise: generating the ed25519 keypair
 
 Your task is to generate the keypair, which involves the following steps:
 - generate new prng seed, which should call the new_entropy function 
@@ -358,20 +368,29 @@ pub fn generate_keypair(
 ```
 </details>
 
-> **What is ed25519?**
->
-> TBC
-
 > **Why did we need so many steps?**
 >
-> The generate_keypair function involved two separate things: generating a random number and creating an ed25519 keypair.
-> 
-> Random number generation is a complex topic, and often vulnerable in a blockchain context. In general, generating random numbers involves two steps. Collecting entropy, and running a deterministic random byte generator (?). TBC
+> The generate_keypair function involved two separate things: generating a random number and creating an ed25519 keypair. Let's discuss each one:
+
+> **What are the steps required to generate random numbers?**
 >
-> ed25519 TBC
+> Random number generation is a complex topic, and often vulnerable in a blockchain context. In general, generating random numbers involves two steps. Collecting entropy, and running a deterministic random bit generator (DRBG), also known as a pseudorandom number generator (PRNG). The entropy is the reason that the random output changes. Greater entropy results in greater unpredictability. A good source of entropy is high unpredictable. For example, quantum fluctuations or radioactive decay are very good sources of entropy. On the other extreme, using a constant (not matter how large the number) as the entropy will result in the same "random" output every time. 
+>
+> In general it is better to collect entropy sources from the "analog" world. In Web2 implementations, random number generators often use inputs from hardware such as temperature or vibration frequency of the computer cooling fan as entropy input. In the blockchain world, unfortunately, things are deterministic and isolated from the analog world, which poses a challenge in finding entropy sources. 
+>
+> In our contract, we use a user provided input, combined with the old prng seed, some block time and height information as our entropy. All these result in a new prng seed. It is not ideal, but good enough in our situation. 
+>
+> Once we collect our entropy, we run the new prng seed through a DRBG. A DRBG is, as its name suggests, a deterministic algorithm. The purposes is not to create randomness (that's the entropy's job), but instead to ensure the output has desirable properties for a random number generator. For example, it should be close to impossible for an attacker to gain an advantage in guessing future outputs based on the sequence of previous outputs. Another example is a DRBG should (normally) produce a uniformly distributed output over the possible range.
+>
+> In our code, we use ChaCha20, which is a type of DRBG called a stream cipher. ChaCha is often used because it has good performance, suitable for cryptographic applications, has broad adoption, and has no patents.
 
 
-## Exercise: adding entropy
+> **What is ed25519?**
+>
+> ed25519 is a signature scheme created in 2011. A signature scheme defines the parameters and algorithm used in the signing, verifying and key creation processes. ed25519 is an improvement over many of its predecessors. Is uses curve25519 which is significantly more performant than the secp256k1 curve, for example. Note that Secret Network's query permits are implemented using the secp256k1 scheme, which is a different curve that Bitcoin popularized, and has its pros and cons. 
+
+
+### Exercise: adding entropy
 
 The final function new_entropy gathers entropy from various sources and outputs a 256-bit number. Your task is to add additional entropy then return a [u8;32] array.
 
@@ -406,7 +425,7 @@ pub fn new_entropy(
 </details>
 
 
-## Exercise: changing keypair on ownership transfer
+### Exercise: changing keypair on ownership transfer
 
 We want our NFT to generate a new keypair when it changes ownership. Your task is to work what code to add, andwhich function to add this to.
 
@@ -461,270 +480,137 @@ make build
 The shellscript additionally changes the environment variables, such as SECRET_BOX_ADDRESS. By doing this, our front end will interact with the new contract.
 
 
--------------------------------------------------------
-
 ## Revising the frontend
 
-Let's now switch over to the frontend webapp. 
+The crux of the frontend are these two functionality:
+- Logmein service digitally signing a message using the private key stored in the NFT private metadata  
+- Secretbook app verifying this signature using the public key stored in the NFT public metadata
 
-This part of the tutorial will focus on how to use secret.js to:
-- integrate a frontend app with a Secret smart contract 
-- allow users to create and sign permits
-
-In this box, we use Vue.js as our web development framework. However, our focus is on secret.js. The secret.js code should be similar, if not identical, regardless of which web framwork you choose to use. The exercises below don't cover specific Vue.js concepts, but all the source code is available for you to view for you to understand how it all sticks together. You can then apply the same logic to your preferred web framework.
-
-
-### Exercise: initialize secret.js client
-
-First, navigate to the app/src/components/SecretBox/ContractApi.ts file. This file contains all the functions related to interacting with our RichieRich smart contract. It is imported by the SecretBox.vue component, and you can see the SecretBox component is used in the App.vue top-level parent component. 
-
-Your task is to complete the code to initialize the secret.js Secret Network client. The code here would be similar to what you do in Secret Counter Box, which is an introductory box. SecretNetworkClient is a class that contains account information and useful methods for performing transactions, queries and so on.
-
+Recall we used the ed25519 scheme to generate the keypair in our contract. In order for the signature and verification to work, we need to use this same scheme on our front end. Navigate to the app/src/components/SecretBox/LogmeinService.vue file, and notice we import this package: 
 
 ```ts
-export const initSecretjsClient = async (accounts: SecretNetworkClient[]) => {
-  //
-  // complete code here
-  //
-  return accounts
-}
+import * as ed from '@noble/ed25519'
 ```
 
-<details> <summary> Hint 1: </summary>
+We will use the signature and verification implementations of this package.
 
-You can initialize SecretNetworkClient like you would with any class in javascript/typescript:
+The LogmeinService.vue file handles the signing and verification process. To understand the code, first look at the onButtonClicked function. This function is called when you click on the button with text "Create signature with LogMeIn, and attempt to sign in to Secretbook app" in the frontend GUI. This performs the steps required in the login process we described early in this tutorial:
+- Secretbook (our hypothetical app which the user wishes to log into) generates a random plaintext message
+- Logmein receives this message and signs it using the private key stored in the NFT
+- Logmein sends this signature to Secretbook as a login request
+- Secretbook verifies this signature against the public key stored in the NFT. Login is successful if the signature is valid.
 
-```ts
-new SecretNetworkClient({ ... })
-```
+### Exercise: Signing a message
 
-The values of the fields to initialize it with is imported at the top of the file from the .env file we populated when we ran the create_secret_box.sh script. For example, localSecretUrl takes a value from the environment variables.
-
-```ts
-// Get environment variables from .env
-const localSecretUrl: string = import.meta.env.VITE_LOCALSECRET_LCD
-```
-</details>
-
-### Exercise: define contract api
-
-In the same file (ContractApi.ts), you will see the functions for each message we can send to the contract. 
-
-Complete the code for these functions.
-
-```ts
-export const handleSubmitNetworth = async (
-  secretjs: SecretNetworkClient,
-  networth: string
-) => {
-  const tx = await secretjs.tx.compute.executeContract(
-  {
-    sender: secretjs.address,
-    contract_address: secretBoxAddress,
-    code_hash: secretBoxHash,
-    msg: {
-      //
-      // complete code here
-      //
-    },
-  },
-  {
-    gasLimit: 1_000_000,
-  })
-
-  console.log("Submitted networth")
-}
-```
-
-<details> <summary> Hint 1: </summary>
-
-The message schema should match exactly with our contract. Recall we defined the valid messages in the msg.rs file of our contract. We wrote the variant names in CamelCase in Rust, but they should be in snake_case in typescript. This is because we converted them to snake_case when we serialized them:
-
-```rust
-// we had this macro in our contract to serialize our messages to snake_case
-#[serde(rename_all = "snake_case")]
-```
-
-Additionally, the exact type syntax differs between Rust and Typescript. Note that CosmWasm's `Uint128` would correspond to a Typscript `string`, not `number`. However, we have already written this for you in the function input signatures. 
-
-</details>
-
-<details> <summary> Solution: </summary>
-
-`handleSubmitNetworth` should have the following code. You need to do the same for the other functions, based on the valid messages we defined in msg.rs.
-
-```ts
-export const handleSubmitNetworth = async (
-  secretjs: SecretNetworkClient,
-  networth: string
-) => {
-  const tx = await secretjs.tx.compute.executeContract(
-  {
-    sender: secretjs.address,
-    contract_address: secretBoxAddress,
-    code_hash: secretBoxHash,
-    msg: {
-      submit_net_worth: { networth },
-    },
-  },
-  {
-    gasLimit: 1_000_000,
-  })
-
-  console.log("Submitted networth")
-}
-```
-</details>
-
-
-### Exercise: create permit
-
-Remember that permits are signed off-chain. This means it is critical for us create a frontend to sign permits. The ContractApi.ts file also includes the function for this.
-
-Navigate to the bottom of the file and complete the code to generate permits:
-
-```ts
-export async function handleGeneratePermit(
-  account: SecretNetworkClient,
-  permitName: string,
-  permissions: CustomPermission[],
-): Promise<Permit> {
-    //
-    // complete code here
-    //
-  // @ts-ignore
-  const permit = "placeholder" as Permit
-
-  console.log(`Generated permit for ${account.address}`)
-
-  return permit;
-}
-
-```
-
-
-<details> <summary> Hint 1: </summary>
-
-SecretNetworkClient has a method to sign permits: 
-
-```ts
-SecretNetworkClient.utils.accessControl.permit.sign(
-```
-
-Secret.js defines the `sign` function this way:
-
-```ts
-  sign(
-    owner: string,
-    chainId: string,
-    permitName: string,
-    allowedContracts: string[],
-    permissions: Permission[],
-    keplr: boolean = true,
-  ): Promise<Permit> {
-    this._checkSigner();
-
-    return newPermit(
-      //@ts-ignore
-      this.signer,
-      owner,
-      chainId,
-      permitName,
-      allowedContracts,
-      permissions,
-      keplr,
-    );
-  }
-```
-</details>
-
-<details> <summary> Hint 2: </summary>
-
-We need to use RichieRich's custom permissions for this permit. Recall the custom permissions were defined in the contract as:
-
-```rust
-pub enum RichieRichPermissions {
-    AllInfo,
-    AmIRichest,
-}
-```
-
-We already defined the same custom permission in our SecretBox component's Types.ts file:
-
-```ts
-export type CustomPermission = "all_info" | "am_i_richest" | ""
-```
-
-CustomPermission type is already in the function input signature.
-
-</details>
-
+Navigate to app/src/components/SecretBox/LogmeinService.vue and find the lmiSign function. The signature variable right now just references the message. Your task is to edit the code so signature is the output of an ed25519 signature of the message using the private key.
 
 <details> <summary> Solution: </summary>
 
 ```ts
-export async function handleGeneratePermit(
-  account: SecretNetworkClient,
-  permitName: string,
-  permissions: CustomPermission[],
-): Promise<Permit> {
-  const permit = await account.utils.accessControl.permit.sign(
-    account.address,
-    "secret-4",
-    permitName,
-    [secretBoxAddress],
-    // @ts-ignore
-    permissions, // ["owner"],
-    false,
-  );
-
-  console.log(`Generated permit for ${account.address}`)
-
-  return permit;
+async function lmiSign() {
+  // ...
+  const signature = await ed.signAsync(message, Uint8Array.from(privKey));
+  // ...
 }
-
 ```
-
 </details>
+
+### Exercise: Verifying a signature
+
+Now, find the verifySignature function. isValid is current simply set to `true`. Edit the code to verify the signature, then return a boolean this is variable depending on whether the signature if valid.
+
+<details> <summary> Solution: </summary>
+
+```ts
+async function verifySignature(
+) {
+  // ...
+  const isValid = await ed.verifyAsync(signature, message, pubKey);
+  // ...
+}
+```
+</details>
+
+### Exercise: Verifying login
+
+Now go to verifyLogin. This should call the verifySignature function and return a boolean on whether the signature if valid or now.
+
+<details> <summary> Solution: </summary>
+
+```ts
+const verifyLogin = async (
+  loginRequest: LoginRequest,
+) => {
+  // ...
+  if (pubKey !== undefined ) {
+    const isValid = await verifySignature(
+      loginRequest.signature,
+      loginRequest.message,
+      Uint8Array.from(pubKey),
+    )
+    console.log(`checked signature valid: ${isValid}`)
+    loginAttemptResult.value = isValid
+    return isValid
+  } // ...
+  // ...
+}
+```
+</details>
+
+
 
 ## Using the front-end app
 
-- At this point your front end app should look like this: ![screenshot](./illustrations/richierich-app-screenshot.png)
+- At this point your front end app should look like this: ![screenshot](./illustrations/logmein-app-screenshot.png)
 
-The app is designed to help developers understand how viewing keys and permits work by interacting with a graphical user interface (GUI). The GUI is divided into two sections:
-- Account-level messages
-- Query messages
+The app is designed to help developers understand how this implementation of logmein works by interacting with a graphical user interface (GUI). The GUI is divided into two sections:
+- Contract interface, which includes the account-level messages subsection and queries subsection. 
+- Log Me In interface, which includes the Log Me In service and Secretbook App login subsections
 
-The first section, account-level messages, are for execute messages (on-chain) and permit generation (off-chain). There are four sub-sections, each specific to one of the four accounts we created in our `SecretNetworkClient` initialization.
+The first subsection, account-level messages, are for execute messages (on-chain) and permit generation (off-chain). There are two accounts. The first account can mint new NFTs, transfer NFTs, and generate keypairs for its NFTs. Additionally, it can generate permits for any of its NFT, which is done offchain (note that permits are generated off-chain. See our Viewing Keys and Permit pathway or RichieRich SecretBox to understand this better). The second account can do all these except that it cannot mint NFTs.
 
-To submit net worth, enter a number in the first box and click the “Submit Networth” button. To set a viewing key, type any string as the viewing key and click “Set viewing key”. You will need to remember this key for later use.
+The second subsection, queries, allows us to see the public information on all tokens we have created so far. Queries are not account-specific, as contracts cannot verify the caller for queries securely. The query section represents “any” party who wishes to send a query message.
 
-To generate a permit, enter any string as the permit name and enter the permission which should be either `all_info` or `am_i_richest`. Recall that these are our two custom permissions that we defined. Generating permits is done by the front-end app with no interaction with the contract. If successful, you will see the newly generated permit added to the list of permits towards the bottom of the app. We index each permit generated with an integer; the first permit you generate should be numbered `1`. This is for convenience when you later perform query permits. Instead of typing the entire permit JSON, you only need to specify the index and the app pulls the correct permit to send with the query.
-
-The contract only accepts one round. Once two players have submitted their networth, the contract will reject any further networth inputs. If you want to play another round, you can redeploy a new contract by running either script below:
-
-```sh
-# run the shellscript that deploys a new contract and sets the environment variables to point to this new contract 
-./scripts/create_secret_box.sh
-
-# does the exact same thing, but using the Makefile script we've defined
-make deploybox
-``` 
+This is an example of the query result after minting three tokens, generated keypairs for two of them, generating a permit for one of them, and transfering one to Account1: ![screenshot](./illustrations/logmein-app-query-screenshot.png)
 
 
-The second section, queries, are for performing viewing key or permit queries, and then viewing the results. These are not account-specific, as contracts cannot verify the caller for queries securely (otherwise there may not be a need for viewing keys in the first place). The query section represents “any” party who wishes to send a query message.
+In the Log Me In service, we can enter the token_id we wish to use to log in to Secretbook, and the corresponding query permit index. Note that generating permits is done by the front-end app with no interaction with the contract. If successful, you will see the newly generated permit added to the list of permits towards the bottom of the app. We index each permit generated with an integer; the first permit you generate should be numbered `1`. This is for convenience when you later use this permit to log in. Instead of typing the entire permit JSON, you only need to specify the index and the app pulls the correct permit.
 
-To perform a viewing key query, enter one of the four public addresses in the first field (e.g., `secret1ap26qrlp8mcq2pg6r47w43l0y8zkqm8a450s03`) and the viewing key that you created earlier for that specific account. When you click one of the buttons “VK Query: All Info” or “VK Query: Am I Richest”, you will see the result of your query appear at the box at the bottom of the app. Viewing keys will work for both query messages.
+In the Secretbook app subsection, we see the result of our most recent attempted login. Note that it starts with "Login failed" when the our Secretbox app initializes. 
 
-To perform a permit query, enter the index of the permit you created (e.g. try inputting `1` or `2`) and click either of the two "Permit Query" buttons. If the permit has the correct permission for the query type, you will see the result at the bottom box. If the permission is wrong, there will be an error. As you can see, standard implementations for permits allow more fine-grained access control. Note that you also don’t need to enter the address of the account you wish to query because the permit itself already contains the public address of the signer.
+Now, try minting a new NFT with token_id "myNFT", then generate a keypair and permit for it. We now have an NFT for Account0 that has a keypair, so this NFT can be used to log in. Also, with a permit, Account0 can give the Log Me In service access to the private key. To check this, go to the queries subsection, and click the button "Query token data". You will see the public jinformation of this token. Now go to the Log Me In section, enter "myNFT" as the token_id and "1" as the permit index. Click the button "Create signature with LogMeIn, and attempt to sign in to Secretbook app". Now see if there is a green box with "Login Successful" just below.
 
 
-> **Is it possible to improve the user experience by allowing more than one round?**
-> Yes, it is possible. If you are interested, you can improve the contract such that after taking two inputs, another round begins. You can even allow multiple rounds to run concurrently. Doing this does not increase or decrease the severity of the vulnerability described earlier. It is not difficult to implement these changes; it just requires more lines of code. It is not required for our purposes though, as we can easily instantiate new contracts each time we wish to start a new round.
 
-> **Additional exercise: revoking permits**
+## Discussion 
+
+> **What's the issue with this implementation?**
+> 
+> The goal of LogMeIn is to try to improve user experience in the Web3 space. Instead of remember a username and password, you just own an NFT. However, there are several issues with this specific implementation that falls short of that goal if we were to launch this as a production-ready application. We will discuss two categories of problems: usability and security. 
 >
-> Notice that we do not have a revoke permit functionality in this Secret Box. A bonus exercise is to implement this functionality in this contract. We describe the steps on how to do this in our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
+> Usability: 
+> - The app that the user wishes to sign into needs to work with Logmein. This raises immediate questions about adoption.
+> - The user experience is not really easier than a traditional Web2 solution, such as a password manager. The user needs to create a permit to grant LogMeIn permission to accept the private Metadata. The user is likely to need a Web3 wallet for this. The user also needs to acquire an NFT, and remember which NFT corresponds to which login. They could, of course, use a single NFT for all their logins. But that risks losing access to their accounts if they lose access to their NFT. 
+> - A valid criticism is whether using private/public keys this way is overengineering. Why not just store the username and password in the metadata? This may also solve the adoption problem mentioned above. Additionally, simpler is generally better as it reduces the surface area of attack.
+>
+> Security:
+> - The user needs to trust LogMeIn. After LogMeIn signs the message from SecretBook, it possesses a signature that can be used to log in without the user's authorization. For example, it can sell the signature to an adversary. Note that the user may not even be aware that they had just been compromised, making it a "silent attack".
+> - This is why we have Secretbook generating a random plaintext message to be signed for each log in. This way, the only way LogMeIn can gain unauthorized access is if it uses the signautre to log in before the user does. The advantage here is that the user will be aware that they have just been compromised, ie: a "loud attack".
+> - However, this doesn't really solve the problem. LogMeIn still has the private key of the NFT keypair. It can make another request to Secretbook, create a new signature, and sign in without the user's authorization. What if the user generates a new keypair after each log in attempt? Unfortunately, LogMeIn still possesses the user's query permit. The user can of course, revoke the permit and change their NFT keypair after every log in atttempt. But this raises the question about usability, including paying for the gas fees of two transactions for every log in attempt. 
+> - LogMeIn can of course be a local client installed by the user, whose code is open source (auditable). This helps as the signing process no longer needs to be trustless. However, it does not help with usability. Additionally, the world process of cryptographically signing messages becomes quite redundant without the need for trustlessness.  
+
+So, it may not be entirely unfair to criticize LogMeIn that it is overengineered, has a large surface area of attack, requires trusting a party, and doesn't improve user experience. But then, if it were production-ready, we would have taken this idea further, rather than making a Secret Box. The idea of this box is to showcase implementing cryptography at a contract level. Thanks to this we showed you how we can implement assymetric cryptography in contracts. Note that query permits are largely based on these concepts. It is a real example of applying cryptography at the application level. 
+
+We hope you will push the boundaries by using cryptography in your contracts, and if you chose to do so, we hope this box also illustrates the need to have a very keen eye on vulnerabilities when doing so.
+
+
+> **Additional exercises**
+>
+> Streamline the front end to be more suitable for a user-facing application.
+>
+> Change the design such that a keypair is created when minting an NFT. With this, all NFTs will have a keypair stored in its metadata (unlike our implementation, where newly minted NFTs have no keypairs). This way, users do not need to create a keypair on newly minted NFTs before using them. 
+>
+> Solve any of the problems we just discussed in "What's the issue with this implementation"?
 
 
 Congratulations on completing this tutorial!
@@ -732,6 +618,8 @@ Congratulations on completing this tutorial!
 We at [Secret University](https://scrt.university) hope you've not only enjoyed working through the **Exercise** steps, but that you've also learned a bit of what Secret Contracts are all about.
 
 ## Further Reading
+
+- Our [RichieRich Secret Box](TBC)
 
 - Our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits) discusses authenticated queries in detail. 
 
@@ -749,11 +637,3 @@ We at [Secret University](https://scrt.university) hope you've not only enjoyed 
     - [Learn Typescript](https://www.typescriptlang.org/docs)
 
 
-
-> **What's the issue with this simple implementation?**
-> 
-> Our focus with RichieRich is to demonstrate viewing keys and permits. So these parts are secure. However, the core contract itself has a critical privacy vulnerability. A side channel attack can reveal the networth of the other user. 
->
-> Let's start with the most naive implementation of all, where two users submit their networth, and are able to revise their inputs any time. Suppose one user (Alice) has submitted her networth, then the other user (Bob) can submit “dummy” inputs starting from 0 SCRT and progressively increment the amount until he sees the result switch from is_richest == False to is_richest == True. This effectively reveals Alice’s exact networth. Notice that Alice can also perform the same attack on Bob, assuming that Bob does not perform the attack first.  
->
-> This attack cannot be done on the RichieRich contract, as it only allows one input per user. Once it accepts two user inputs, it stops accepting anything else. This prevents someone from entering values arbitrarily as described above. However, this exact attack can still be performed by the second user, by utilizing a side channel. Bob could create many forks of the mainnet and try different networth inputs on each, until he determines Alice’s exact networth. While this attack is more complex and only compromises the first user, it is still relatively trivial for a determined attacker. This vulnerability is also described in the Secret docs’ [description of some vulnerabilities](https://docs.scrt.network/secret-network-documentation/overview-ecosystem-and-technology/techstack/privacy-technology/theoretical-attacks#more-advanced-tx-replay-attacks-search-to-decision-for-millionaire-s-problem).
