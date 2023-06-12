@@ -1,14 +1,5 @@
 # Logmein Box Tutorial
 
-This is a fork of SNIP721 commit ed7c59d, committed on 4th Jan 2023.
-
-```rust
-    GenerateKeypairs {
-        token_id: String,
-        entropy: Option<String>,
-    },
-```
-
 ## Introduction
 
 Welcome to the Logmein Box tutorial! In this tutorial, we will implement cryptography at the contract level, and use it as a log in tool. The this contract is mostly based on [this](TBC), although we implement it slightly differently in this box, particularly the front end.
@@ -61,366 +52,393 @@ The files you will be working with are:
 In these files, look for sections marked with the comments `// complete code here`. These are the core parts of code required to implement authenticated queries.
 
 
----------------------------
+## Logmein contract design
 
-## Implementing viewing keys
+The Logmein contract is a modified Secret NFT. It has all the features of a SNIP721 token, with a few additions:
+- it accepts an additional execute msg to generate a new keypair
+- a new keypair gets generated when the token is transferred
+- (optional): a keypair is automatically crated when the token is minted. 
 
-Viewing keys act a bit like passwords against the public key (which are like usernames). By creating a strong viewing key, it will be computationally infeasible for someone to have unauthorized access to your account by guessing your key. 
+The last item, which is optional, is not implemented in this Secret Box, although we left some incomplete code commented out for you to implement this if you are up for the challenge. Are are pros and cons to doing this. Automatically generating a keypair when a token gets minted means there will always be a keypair stored on the NFT, which may have some benefits if you definitely want to use this keypair feature.
 
-Our contract already implements the execute functions we need. However, the queries have not yet been implemented. At this point, the contract can accept two query messages `all_info` and `am_i_richest` but simply returns a blank response to the caller.
+As a modified NFT, a logical first step is to fork the SNIP721 reference implementation. This contract is a fork of the [SNIP721 reference implementation](https://github.com/baedrik/snip721-reference-impl). Specifically, this particular box forked commit ed7c59d, which was made on 4th Jan 2023.
 
-So let's do something about it.
+There are probably more scalable ways than forking the SNIP721 reference contract, such as importing the SNIP721 contract or creating a mod. However, that is beyond the scope of this Secret Box.
 
-Begin by opening the src/msg.rs file, and find the QueryMsg enum.
 
-```rust
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum QueryMsg {
-    AllInfo { 
-        addr: Addr,
-        key: String,
-    },
-    AmIRichest {
-        addr: Addr,
-        key: String,
-    },
-    //
-    // complete code here
-    // 
-}
-```
+## Exercise: Defining the GenerateKeypairs message
 
-The above code defines the QueryMsg variants for our two viewing key queries. Notice they each accept two fields: addr and key. These two fields are the minimum required for any viewing key query, as these two fields are used by the contract to authenticate a viewing key. If this is not clear to you, we explain this in more detail in our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
+Our modified SNIP721 needs to accept an execute message with this JSON schema:
 
-We decided to have an easy start. Everything is already done here, so there is nothing further for you to do. The incomplete code is for permits, which we will do later. Just examine the code above and make sure there is nothing unclear.
-
-### Exercise: implement get_validation_params method
-
-Complete the code implementing the `get_validation_params` method on QueryMsg. You will see this in the src/msg.rs file, which is the incomplete code for you to work on:
-
-```rust
-impl QueryMsg {
-    pub fn get_validation_params(&self) -> (/* complete code here */) {
-        //
-        // complete code here
-        //
+```json
+{
+    "generate_keypairs": {
+        "token_id": "string",
+        "entropy": "string"
     }
 }
 ```
 
-This method should return the address and viewing key for all possible viewing key query variants in QueryMsg. It’s also a good idea to verify that the address is in a valid format, which will require an additional input field.
+...where the entropy field is optional.
 
-<details> <summary> Hint 1:</summary>
+In other words, if a user wishes to generate a new keypair on an NFT, they send this execute message specifying the token_id and an optional entropy string which is used to randomly generate a new private and public key in the NFT metadata.
 
-The return type should be 
-```
-StdResult<(Addr, String)>
-```
-</details>
-
-<details> <summary> Hint 2:</summary>
-
-The method should look at the possible variants of QueryMsg, and return the corresponding address and key. So, first line of code in the method should be:
-```
-        match self {
-```
-</details>
+Navigate to msg.rs. Your task is to add this variant to the ExecuteMsg enum.
 
 <details> <summary> Solution: </summary>
 
 ```rust
-impl QueryMsg {
-    pub fn get_validation_params(&self, api: &dyn Api) -> StdResult<(Addr, String)> {
-        match self {
-            Self::AllInfo { addr, key } => {
-                let address = api.addr_validate(addr.as_str())?;
-                Ok((address, key.clone()))
+pub enum ExecuteMsg {
+    // ...
+    GenerateKeypairs {
+        token_id: String,
+        entropy: Option<String>,
+    },
+}
+```
+</details>
+
+## Exercise: Adding keypair to the Extension struct
+
+Next let's modify the token. In the token.rs file, we define the `Token` struct, which stores important information about the token. We also define the Metadata struct, which has all the information that can be stored in the token's metadata. These are part of the standard SNIP721 implementation. Notice Metadata has a field called extension, which stores on optional Extension type. In the Extension struct, let's add the ability to store the keypair required for Logmein. Let's call the field `auth_key`. This should be a 32-byte array, which represents a 256-bit number. Note a byte can be represented by a u8 type.
+
+Your task is to add this field in the Extension type.
+
+<details> <summary> Solution: </summary>
+
+```rust
+pub struct Extension {
+    // ...
+    pub auth_key: Option<[u8; 32]>
+}
+```
+</details>
+
+## Exercise: defining a method to add auth_key
+
+We want the Metadata type to have a method called `add_auth_key` which accepts a 32-byte array and makes that the token's auth_key. It should not modify any existing information in the token's metadata. 
+
+There are several ways to implement this. In our code, we have implemented this method on both Metadata and Extension. Your task is to complete this code. Note that if there is a token_uri (ie: metadata that is stored off-chain), it will throw an error.
+
+<details> <summary> Solution: </summary>
+
+```rust
+impl Metadata {
+    pub fn add_auth_key(&self, new_key: &[u8; 32]) -> StdResult<Metadata> {
+        // ...
+
+        let ext = &self.extension.clone().unwrap_or_default();
+
+        Ok(
+            Metadata {
+                token_uri: None,
+                extension: Some(ext.add_auth_key(new_key)),
             }
-            Self::AmIRichest { addr, key } => {
-                let address = api.addr_validate(addr.as_str())?;
-                Ok((address, key.clone()))
-            },
+        )
+    }
+}
+
+impl Extension {
+    fn add_auth_key(&self, new_key: &[u8; 32]) -> Extension {
+        Extension {
+            auth_key: Some(*new_key),
+            ..self.clone()
         }
     }
 }
 ```
 </details>
 
-A note on the `&dyn Api` syntax:
+## Exercise: handling the GenerateKeypairs execute message
 
-To verify that the address is in a valid format, we use `addr_validate` method of the Api trait. In order to do this, we add the `api` input field which has the type signature `&dyn Api`. If you’re unfamiliar, this is the syntax for a trait object. A trait object is a concept in Rust, and is commonly used in CosmWasm. Essentially, trait objects do not specify the required concrete type, but instead it allows the function to accept any type that implements the required trait. The concrete type can only be known at runtime. Using trait objects instead of concrete types provides more flexibility, while retaining the safety guarantees that Rust provides. One downside is that Rust’s compiler cannot check for all possible errors at compile time. Another downside is a small performance penalty, which may be significant in systems engineering but is immaterial in the context of smart contracts. If you wish to learn more, The [Rust Book](https://doc.rust-lang.org/stable/book/ch17-02-trait-objects.html) provides an in-depth explanation of trait objects.
-
-
-### Exercise: validate and handle viewing key queries
-
-Next, open the src/contract.rs file. At the query entry point function, you will find these lines of incomplete code:
-
-Here, we need to first obtain the address and viewing key from the query message. Then, we need to check if the viewing key is valid, and handle the success and error outcomes.
-
-
-```rust
-    let q_response = match msg {
-        QueryMsg::AllInfo { .. } => {
-            //
-            // complete code here
-            // 
-            ()
-        },
-        QueryMsg::AmIRichest { .. } => {
-            //
-            // complete code here
-            // 
-            ()
-        },
-        // ...
-    };
-    to_binary( /* complete code here */ "placeholder")
-```
-
-<details> <summary> Hint 1:</summary>
-
-We should utilize the method we just defined in msg.rs. 
-</details>
-
-<details> <summary> Hint 2:</summary>
-
-The ViewingKey struct has an associated function called `check` which verifies the viewing key.
-</details>
+In the execute entry point function, we need to handle the new variant we defined in ExecuteMsg. Add that in the match arm of the execute entry point function.
 
 
 <details> <summary> Solution: </summary>
 
 ```rust
-    let q_response = match msg {
-        QueryMsg::AllInfo { .. } => {
-            let (address, validated_key) = msg.get_validation_params(deps.api)?;
-            let result = ViewingKey::check(deps.storage, address.as_str(), validated_key.as_str());
-            match result.is_ok() {
-                true => query_all_info(deps, address),
-                false => Err(StdError::generic_err("Wrong viewing key for this address or viewing key not set")),
-            }
-        },
-        QueryMsg::AmIRichest { .. } => {
-            let (address, validated_key) = msg.get_validation_params(deps.api)?;
-            let result = ViewingKey::check(deps.storage, address.as_str(), validated_key.as_str());
-            match result.is_ok() {
-                true => query_richest(deps, address),
-                false => Err(StdError::generic_err("Wrong viewing key for this address or viewing key not set")),
-            }
-        },
-        // ...
-    };
-    to_binary(&q_response?)
+    ExecuteMsg::GenerateKeypairs { token_id, entropy } => metadata_generate_keypair(
+        deps,
+        &info.sender, 
+        env, 
+        &config, 
+        &token_id, 
+        entropy
+    )
 ```
 </details>
 
-Note that the code above has repeated parts. We wrote it this way for clarity for this lesson, but you should normally modularize your code. In this case, because both queries accept the same arguments, we can do this:
+
+
+## Functions that generate keypairs
+
+We have a total of four new functions in contract.rs to handle generating keypairs. 
+- metadata_generate_keypair checks that the message caller is indeed authorized to generate keypairs for the token. If so, we call the next function, metadata_generate_keypair_impl. Otherwise, we throw an error.
+- metadata_generate_keypair_impl calls the generate_keypair function using the prng seed as input, then updating this seed. Then, it updates the NFT's private and public metadata with the private and public keys respectively.
+- generate_keypair calls the new_entropy function to produce a random byte array based on the Optional user input and prng_seed. It then uses this byte array output to generate an ed25519 keypair using the ed25519 Rust package. 
+- new_entropy takes an entropy input and the prng_seed stored in the contract as inputs. It then mixes this with some additional entropy, such as the block time and height, to produce a random 256-bit number.
+
+> **A note of caution generating random numbers this way**
+>
+> Generating numbers fully on-chain is challenging to do in a secure way. Even with the ability to have a hidden prng_seed does not solve problems for all use cases. For this use case, generating random numbers like this is mostly secure. For most other applications, we recommend using Secret Networks VRF.
+
+## Exercise: authenticating the caller
+
+We have defined the error message. Your task is to write the logic that authenticates the message sender. The rule is to allow the following addresses to proceed:
+- token_id owner 
+- contract admin
+- minters, only if minter_may_update_metadata (a configuration setting) is set to true
+
+
+<details> <summary> Solution: </summary>
 
 ```rust
-#[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    let q_response = match msg {
-        QueryMsg::AllInfo { .. } => handle_viewing_key_query(deps, &msg, query_all_info),
-        QueryMsg::AmIRichest { .. } => handle_viewing_key_query(deps, &msg, query_richest),
-    };
-
-    to_binary(&q_response?)
-}
-
-fn handle_viewing_key_query(
-    deps: Deps,
-    msg: &QueryMsg,
-    query_fn: fn(Deps, Addr) -> StdResult<Binary>,
-) -> StdResult<Binary> {
-    let (address, validated_key) = msg.get_validation_params(deps.api)?;
-    let result = ViewingKey::check(deps.storage, address.as_str(), validated_key.as_str());
-    match result.is_ok() {
-        true => query_fn(deps, address),
-        false => Err(StdError::generic_err(
-            "Wrong viewing key for this address or viewing key not set",
-        )),
+    if !( sender_raw == token.owner || sender_raw == config.admin ) {
+        let minters: Vec<CanonicalAddr> =
+            may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
+        if !config.minter_may_update_metadata || !minters.contains(&sender_raw) {
+            return Err(StdError::generic_err(custom_err));
+        }
     }
-}
 ```
+</details>
 
-Imagine if there were a large number of queries, consisting of non-authenticated queries, viewing key queries and permit queries. Separating these three types of queries would be immensely helpful.
+
+## Exercise: using prng_seed to call generate_keypair
+
+Navigate to the metadata_generate_keypair_impl function. Notice there are three blocks of code to complete. Let's start with the first block, which should call the generate_keypair function using the prng_seed as input.
 
 
-## Implementing query permits
-
-Query permits make use of digital signatures to validate a query. The account wishing to grant access creates a permit message that includes important information such as the permissions granted, tokens, and permit name. This message is signed by the account owner, creating a cryptographic digital signature that is infeasible to forge without access to the private key. This whole process is done off-chain. The permit iself is a data structure that contains the digital signature, the plaintext permit message, and the public key of the signer.
-
-When a user wishes to make a permit query, they send this permit along with the query message. The contract verifies the signature against the message and public key of the signer. If it is valid, it proceeds with the private query by executing the query message. 
-
-If you want to understand how all these work in more detail, we have an in-depth discussion in our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
-
-Now, let's implement query permits. 
-
-### Exercise: define permit query messages
-
-At this point, the only query messages the contract accepts are the two viewing key queries. Let's now define the permit query messages that our contract can accept.
-
-Add a new variant to the QueryMsg enum called `WithPermit`. It should accept two fields: `permit` and `query`.
-
-```rust
-pub enum QueryMsg {
-    AllInfo { 
-        addr: Addr,
-        key: String,
-    },
-    AmIRichest {
-        addr: Addr,
-        key: String,
-    },
-    //
-    // complete code here
-    // 
-}
-```
-
-Additionally, we have two other enums that are incomplete. These should give you hints on what types the fields in `WithPermit` should have.
-
-```rust
-pub enum QueryWithPermit {
-    //
-    // complete code here
-    //
-}
-
-pub enum RichieRichPermissions {
-    //
-    // complete code here
-    //
-}
-```
 <details> <summary> Hint 1: </summary>
-The QueryWithPermit type defines the set of query messages that our contract can accept when a permit is provided. In our case, we support two query messages: AllInfo and AmIRichest. 
+We need to call the valued stored in PRNG_SEED_KEY, which is used as an input to generate a keypair. Once we use this seed, we need to modify it so we are not reusing the same seed the next time a keypair is generated with this contract. Notice the generate_keypair function returns a new prng_seed, which we should use.
+</details>
+
+<details> <summary> Solution: </summary>
+
+```rust
+pub fn metadata_generate_keypair_impl(
+    // ...
+) -> StdResult<Response> {
+    // generate the new public/private key pair
+    let prng_seed: Vec<u8> = load(deps.storage, PRNG_SEED_KEY).unwrap();
+    let (pubkey, scrtkey, new_prng_seed) = generate_keypair(env, sender, prng_seed, entropy);
+    save(deps.storage, PRNG_SEED_KEY, &new_prng_seed).unwrap();
+
+    // ...
+}
+
+pub fn instantiate(
+    // ...
+) -> StdResult<Response> {
+    // ...
+    save(deps.storage, PRNG_SEED_KEY, &prng_seed)?;
+    // ... 
+}
+
+```
+</details> 
+
+## Exercise: updating the metadata
+
+Now that we have the public and private keys, we need to update the NFT's metadata. Your task is to write the code for this.
+
+
+<details> <summary> Hint 1: </summary>
+We want to update the auth_key field only, and keep any other metadata unchanged. This means we need to first load the existing metadata.
 </details>
 
 <details> <summary> Hint 2: </summary>
-The Permit type is a generic type that represents a permit for a specific set of permissions. We don't want the default permissions that are used for SNIPs, such as balance and history. Instead, we want our custom permissions to determine which of the two queries is allowed. We use the RichieRichPermissions enum to define this set of custom permissions that our contract supports.
+We should use the add_auth_key method we defined earlier for the Metadata type.
 </details>
 
-<details> <summary> Solution: </summary>
 
-```rust
-pub enum QueryMsg {
-    //...
-    WithPermit {
-        permit: Permit<RichieRichPermissions>,
-        query: QueryWithPermit,
-    },
-}
-
-pub enum QueryWithPermit {
-    AllInfo {  },
-    AmIRichest {  },
-}
-
-pub enum RichieRichPermissions {
-    AllInfo,
-    AmIRichest,
-}
-```
-
+<details> <summary> Hint 3: </summary>
+There may be no metadata stored in the NFT. In this situation, we should create a metadata entry with default values. We will need to import token::Extension to do this.
 </details>
 
-In our solution, RichieRichPermissions defines which of the two queries is allowed with a given permit. So, if the permit has the AmIRichest permission, the caller cannot query `am_i_richest`.
 
-An alternative design is to have two variants along the lines of `AnyQuery` and `ResultOnly`. The first permission allows the caller to perform either query, while the second only allows the `am_i_richest` query. 
-
-### Exercise: handle permit queries
-
-Now let's look at src/contract.rs. The first thing to do is to add our new variant to the match arm in the query entry point.
+<details> <summary> Solution for last two exercises: </summary>
 
 ```rust
-#[entry_point]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    let q_response = match msg {
-        // ...
+use crate::token::Extension;
 
-        //
-        // complete code here
-        // 
-    };
+pub fn metadata_generate_keypair_impl(
+    deps: &mut DepsMut,
+    sender: &Addr,
+    env: &Env,
+    entropy: Option<String>,
+    idx: u32,
+) -> StdResult<Response> {
+    // generate the new public/private key pair
+    let prng_seed: Vec<u8> = load(deps.storage, PRNG_SEED_KEY).unwrap();
+    let (pubkey, scrtkey, new_prng_seed) = generate_keypair(env, sender, prng_seed, entropy);
+    save(deps.storage, PRNG_SEED_KEY, &new_prng_seed).unwrap();
 
-    to_binary( /* complete code here */ "placeholder")
+    // update private metadata with the private key.
+    let mut priv_meta_store = PrefixedStorage::new(deps.storage, PREFIX_PRIV_META);
+    let maybe_priv_meta: Option<Metadata> = may_load(&priv_meta_store, &idx.to_le_bytes())?;
+    let priv_meta = maybe_priv_meta.unwrap_or(
+        Metadata {
+            token_uri: None,
+            extension: Some(Extension::default()),
+        }
+    );
+    let new_priv_meta =  priv_meta.add_auth_key(&scrtkey.to_bytes())?;
+    save(&mut priv_meta_store, &idx.to_le_bytes(), &new_priv_meta)?;
+
+    // update public metadata with the public key
+    let mut pub_meta_store = PrefixedStorage::new(deps.storage, PREFIX_PUB_META);
+    let maybe_pub_meta: Option<Metadata> = may_load(&pub_meta_store, &idx.to_le_bytes())?;
+    let pub_meta = maybe_pub_meta.unwrap_or(
+        Metadata {
+            token_uri: None,
+            extension: Some(Extension::default()),
+        }
+    );
+    let new_pub_meta =  pub_meta.add_auth_key(&pubkey.to_bytes())?;
+    save(&mut pub_meta_store, &idx.to_le_bytes(), &new_pub_meta)?;
+
+
+    Ok(
+        Response::new().set_data(to_binary(&ExecuteAnswer::GenerateKeypairs {
+            status: Success,
+        })?),
+    )
+}
+
+pub fn instantiate(
+    // ...
+) -> StdResult<Response> {
+    // ...
+    save(deps.storage, PRNG_SEED_KEY, &prng_seed)?;
+    // ... 
 }
 ```
+</details> 
+
+## Exercise: generating the ed25519 keypair
+
+Your task is to generate the keypair, which involves the following steps:
+- generate new prng seed, which should call the new_entropy function 
+- use this prng seed as input to a ChaChaRng algorithm to generate random bytes 
+- use this random bytes output to create an ed25519 keypair
 
 <details> <summary> Hint 1: </summary>
-This arm should call the `permit_queries` function. 
+We need to handle the fact that user entropy is an optional input. If the user did not provide entropy, we can use the prng_seed or any other substitute entropy.
 </details>
 
-Now let's complete the permit_queries function, which has the bulk of the logic required to process permit queries.
+<details> <summary> Hint 2: </summary>
+We have already imported the ChaChaRng package. Use this to generate a seed from the entropy.
+</details>
 
-```rust
-fn permit_queries(deps: Deps, env: Env, permit: Permit /* add generic */, query: QueryWithPermit) -> (/* complete code here */) {
-    // Validate permit content
-    let contract_address = env.contract.address;
-        //
-        // complete code here
-        // 
-
-    // Permit validated! We can now execute the query.
-        //
-        // complete code here
-        // 
-
-}
-```
-<details> <summary> Hint 2: </summary> The permit argument should have a generic type parameter for RichieRichPermissions. This specifies that the permit is for the RichieRichPermissions type. </details>
-
-<details> <summary> Hint 3: </summary> To validate the permit content, we can use the secret_toolkit::permit::validate function. This function takes in several arguments including deps, PREFIX_REVOKED_PERMITS, &permit, contract_address.into_string(), and None. It returns the account associated with the permit if validation is successful. </details>
-
-<details> <summary> Hint 4: </summary> After the permit is validated, we can execute the query by matching on the query argument. For each variant of the QueryWithPermit enum, we need to check if the permit has the required permission using the check_permission method. If it does, we can call the appropriate query function. If it does not, we can return an error indicating that the permit does not have the required permission. </details>
+<details> <summary> Hint 3: </summary>
+The ed25519_dalek::Keypair struct has an associated function called generate. Use this to generate a keypair from the seed.
+</details>
 
 
 <details> <summary> Solution: </summary>
 
 ```rust
-fn permit_queries(deps: Deps, env: Env, permit: Permit<RichieRichPermissions>, query: QueryWithPermit) -> StdResult<QueryAnswer> {
-    // Validate permit content
-    let contract_address = env.contract.address;
+pub fn generate_keypair(
+    // ...
+) -> (PublicKey, SecretKey, Vec<u8>) {
 
-    let account = secret_toolkit::permit::validate(
-        deps,
-        PREFIX_REVOKED_PERMITS,
-        &permit,
-        contract_address.into_string(),
-        None,
-    )?;
+    // generate new rng seed
+    let new_prng_bytes: [u8; 32] = match user_entropy {
+        Some(s) => new_entropy(env, sender, prng_seed.as_ref(), s.as_bytes()),
+        None => new_entropy(env, sender, prng_seed.as_ref(), prng_seed.as_ref()),
+    };
 
-    // Permit validated! We can now execute the query.
-    match query {
-        QueryWithPermit::AllInfo {} => {
-            if !permit.check_permission(&RichieRichPermissions::AllInfo) {
-                return Err(StdError::generic_err(format!(
-                    "No permission to query, got permissions {:?}",
-                    permit.params.permissions
-                )));
-            }
+    // generate and return key pair
+    let mut rng = ChaChaRng::from_seed(new_prng_bytes);
+    let keypair = Keypair::generate(&mut rng);
 
-            query_all_info(deps, deps.api.addr_validate(&account)?)
-        }
-        QueryWithPermit::AmIRichest {  } => {
-            if !permit.check_permission(&RichieRichPermissions::AmIRichest) {
-                return Err(StdError::generic_err(format!(
-                    "No permission to query, got permissions {:?}",
-                    permit.params.permissions
-                )));
-            }
+    (keypair.public, keypair.secret, new_prng_bytes.to_vec())
+}
+```
+</details>
 
-            query_richest(deps, deps.api.addr_validate(&account)?)
-        }
-    }
+> **What is ed25519?**
+>
+> TBC
+
+> **Why did we need so many steps?**
+>
+> The generate_keypair function involved two separate things: generating a random number and creating an ed25519 keypair.
+> 
+> Random number generation is a complex topic, and often vulnerable in a blockchain context. In general, generating random numbers involves two steps. Collecting entropy, and running a deterministic random byte generator (?). TBC
+>
+> ed25519 TBC
+
+
+## Exercise: adding entropy
+
+The final function new_entropy gathers entropy from various sources and outputs a 256-bit number. Your task is to add additional entropy then return a [u8;32] array.
+
+<details> <summary> Hint 1: </summary>
+We need to add the user entropy and seed to the rng entropy.
+</details>
+
+<details> <summary> Hint 2: </summary>
+We can also add block time in nanoseconds, which is quite difficult to guess ahead of time.
+</details>
+
+
+<details> <summary> Solution: </summary>
+
+```rust
+pub fn new_entropy(
+    // ...
+)-> [u8;32] {
+    // 16 here represents the lengths in bytes of the block height and time.
+    let entropy_len = 16 + sender.to_string().len() + entropy.len();
+    let mut rng_entropy = Vec::with_capacity(entropy_len);
+    rng_entropy.extend_from_slice(&env.block.height.to_be_bytes());
+    rng_entropy.extend_from_slice(&env.block.time.nanos().to_be_bytes());
+    rng_entropy.extend_from_slice(sender.to_string().as_bytes());
+    rng_entropy.extend_from_slice(entropy);
+
+    let mut rng = Prng::new(seed, &rng_entropy);
+
+    rng.rand_bytes()
+}
+```
+</details>
+
+
+## Exercise: changing keypair on ownership transfer
+
+We want our NFT to generate a new keypair when it changes ownership. Your task is to work what code to add, andwhich function to add this to.
+
+<details> <summary> Hint 1: </summary>
+We have written this commented `// complete this code` where you should be adding code. This basically answers the question on where to add the code.
+</details>
+
+<details> <summary> Hint 2: </summary>
+The code should call one of the four functions we wrote earlier in contract.rs.
+</details>
+
+<details> <summary> Solution: </summary>
+
+```rust
+fn transfer_impl(
+    // ...
+) -> StdResult<CanonicalAddr> {
+    // ...
+    metadata_generate_keypair_impl(deps, &deps.api.addr_humanize(sender)?, env, None, idx)?;
+    // ...
 }
 ```
 </details>
 
 
 ## Redeploying contract
+
+We have unit tests written for handle functions and some specifically focusing on the keypair generation function we added. Navigate to lib.rs and uncomment:
+- mod unittest_handles
+- mod unittest_auth
+
+This would bring these two unit test mods into scope. When we run unit tests in the next step, it will ensure that our contract is working the way we intended.
 
 Our contract is now complete. Let's make sure it compiles, then redeploy it to our local blockchain. In your second terminal, run the following commands:
 
@@ -442,36 +460,8 @@ make build
 
 The shellscript additionally changes the environment variables, such as SECRET_BOX_ADDRESS. By doing this, our front end will interact with the new contract.
 
-**(Optional)** You can interact with the contract using secretcli if you want. For example, you can have two users input their networth and perform a viewing key query. 
 
-```sh
-# get the new environment variables
-source .env
-
-# execute messages using the secretcli binary in our docker file
-# submit networth for user `a` 
-docker exec localsecret secretcli tx compute execute $SECRET_BOX_ADDRESS '{"submit_net_worth":{"networth":"100"}}' --from a -y
-
-
-# submit networth for user `b` 
-docker exec localsecret secretcli tx compute execute $SECRET_BOX_ADDRESS '{"submit_net_worth":{"networth":"500"}}' --from b -y
-
-
-# set viewing key for user `a`
-docker exec localsecret secretcli tx compute execute $SECRET_BOX_ADDRESS '{"set_viewing_key":{"key":"super_secret_key"}}' --from a -y
-
-# perform viewing key query for user `a`
-USER_A=$(docker exec localsecret secretcli keys show --address a)
-
-docker exec localsecret secretcli q compute query $SECRET_BOX_ADDRESS '{"all_info":{"addr":"'"$USER_A"'", "key":"super_secret_key"}}'
-```
-
-You should see something like this:
-```bash
-{"AllInfo":{"richest":false,"networth":"100"}}
-```
-
-
+-------------------------------------------------------
 
 ## Revising the frontend
 

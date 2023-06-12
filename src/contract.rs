@@ -515,7 +515,7 @@ pub fn metadata_generate_keypair(
     let (token, idx) = get_token(deps.storage, token_id, opt_err)?;
     let sender_raw = deps.api.addr_canonicalize(sender.as_ref())?;
 
-    // check autherization of the sender
+    // check authorization of the sender
     if !( sender_raw == token.owner || sender_raw == config.admin ) {
         let minters: Vec<CanonicalAddr> =
             may_load(deps.storage, MINTERS_KEY)?.unwrap_or_default();
@@ -605,8 +605,6 @@ pub fn generate_keypair(
 
     // generate and return key pair
     let mut rng = ChaChaRng::from_seed(new_prng_bytes);
-    // let scrt_key = StaticSecret::new(rng);
-    // let pub_key = PublicKey::from(&scrt_key);
     let keypair = Keypair::generate(&mut rng);
 
     (keypair.public, keypair.secret, new_prng_bytes.to_vec())

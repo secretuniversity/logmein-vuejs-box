@@ -475,14 +475,9 @@ pub fn execute(deps: DepsMut, env: Env, info: MessageInfo, msg: ExecuteMsg) -> S
         ExecuteMsg::RevokePermit { permit_name, .. } => {
             revoke_permit(deps.storage, &info.sender, &permit_name)
         }
-        ExecuteMsg::GenerateKeypairs { token_id, entropy } => metadata_generate_keypair(
-            deps,
-            &info.sender, 
-            env, 
-            //
-            // complete code here
-            //
-        )
+        // 
+        // complete code here
+        //
     };
     pad_handle_result(response, BLOCK_SIZE)
 }
@@ -503,19 +498,27 @@ pub fn metadata_generate_keypair(
     mut deps: DepsMut,
     sender: &Addr,
     env: Env,
-    //
-    // complete code here
-    //
+    config: &Config,
+    token_id: &String,
+    entropy: Option<String>,
 ) -> StdResult<Response> {
-    //
-    // complete code here
-    //
-
+    let custom_err = format!("Not authorized to update metadata of token {}", token_id);
+    // if token supply is private, don't leak that the token id does not exist
+    // instead just say they are not authorized for that token
+    let opt_err = if config.token_supply_is_public {
+        None
+    } else {
+        Some(&*custom_err)
+    };
     //
     // edit code below
     //
-    let entropy = Option::Some("placeholder".to_string());
-    let idx = 0u32;
+    let (token, idx) = ("placeholder", 0_u32);
+    
+    // check autherization of the sender
+    //
+    // complete code here
+    //
 
     metadata_generate_keypair_impl(&mut deps, sender, &env, entropy, idx)
 }
@@ -537,6 +540,17 @@ pub fn metadata_generate_keypair_impl(
     entropy: Option<String>,
     idx: u32,
 ) -> StdResult<Response> {
+    // generate the new public/private key pair
+    //
+    // complete code here
+    //
+    
+    // update private metadata with the private key.
+    //
+    // complete code here
+    //
+    
+    // update public metadata with the public key
     //
     // complete code here
     //
@@ -563,10 +577,13 @@ pub fn generate_keypair(
     prng_seed: Vec<u8>,
     user_entropy: Option<String>
 ) -> (PublicKey, SecretKey, Vec<u8>) {
+    
+    // generate new rng seed
     //
     // complete code here
     //
 
+    // generate and return key pair
     //
     // edit code below
     //
@@ -590,8 +607,14 @@ pub fn new_entropy(
     seed: &[u8], 
     entropy: &[u8]
 )-> [u8;32] {
+    // 16 here represents the lengths in bytes of the block height and time.
+    let entropy_len = 16 + sender.to_string().len() + entropy.len();
+    let mut rng_entropy = Vec::with_capacity(entropy_len);
+    rng_entropy.extend_from_slice(&env.block.height.to_be_bytes());
+    // complete code here -- add more entropy to `rng_entropy`
+    
     //
-    // complete code here
+    // edit code below
     //
     
     [0;32]

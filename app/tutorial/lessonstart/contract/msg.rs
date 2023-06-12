@@ -404,13 +404,9 @@ pub enum ExecuteMsg {
         /// optional message length padding
         padding: Option<String>,
     },
-    /// Regenerate the public and private keys used for authentication. This can be called by either
-    /// the token owner, a valid minter (if they have been given the autherization to modify metadata)
-    /// or the admin.
-    GenerateKeypairs {
-        token_id: String,
-        entropy: Option<String>,
-    },
+    //
+    // complete code here
+    // 
 }
 
 /// permission access level

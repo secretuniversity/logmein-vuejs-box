@@ -20,16 +20,18 @@ pub struct Token {
 
 impl Metadata {
     pub fn add_auth_key(&self, new_key: &[u8; 32]) -> StdResult<Metadata> {
-        //
-        // complete code here
-        //
+        if self.token_uri.is_some() {
+            return Err(StdError::generic_err(
+                "Keys cannot be added to a metadata using token_uri.",
+            ));
+        }
 
+        //
+        // edit code below
+        //
         Ok(
             Metadata {
                 token_uri: None,
-                //
-                // edit code below
-                //
                 extension: None,
             }
         )
@@ -81,14 +83,17 @@ pub struct Extension {
     /// token subtypes used by Stashh for display groupings (primarily used for badges, which are specified
     /// by using "badge" as the token_subtype)
     pub token_subtype: Option<String>,
-    /// represents public and privite key pair for authentication in public and private metadata respectively.
-    pub auth_key: Option<[u8; 32]>
+    //
+    // complete code here
+    //
 }
 
 impl Extension {
     fn add_auth_key(&self, new_key: &[u8; 32]) -> Extension {
         Extension {
-            auth_key: Some(*new_key),
+            //
+            // complete code here
+            //
             ..self.clone()
         }
     }

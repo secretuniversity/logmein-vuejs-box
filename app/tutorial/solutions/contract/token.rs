@@ -18,6 +18,16 @@ pub struct Token {
     pub transferable: bool,
 }
 
+/// token metadata
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug, Default)]
+pub struct Metadata {
+    /// optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or
+    /// `ar://`.  Only use this if you are not using `extension`
+    pub token_uri: Option<String>,
+    /// optional on-chain metadata.  Only use this if you are not using `token_uri`
+    pub extension: Option<Extension>,
+}
+
 impl Metadata {
     pub fn add_auth_key(&self, new_key: &[u8; 32]) -> StdResult<Metadata> {
         if self.token_uri.is_some() {
@@ -35,16 +45,6 @@ impl Metadata {
             }
         )
     }
-}
-
-/// token metadata
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug, Default)]
-pub struct Metadata {
-    /// optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or
-    /// `ar://`.  Only use this if you are not using `extension`
-    pub token_uri: Option<String>,
-    /// optional on-chain metadata.  Only use this if you are not using `token_uri`
-    pub extension: Option<Extension>,
 }
 
 /// metadata extension
