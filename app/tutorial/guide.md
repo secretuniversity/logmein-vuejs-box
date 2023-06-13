@@ -2,44 +2,46 @@
 
 ## Introduction
 
-Welcome to the Logmein Box tutorial! In this tutorial, we will implement cryptography at the contract level, and use it as a log in tool. The this contract is mostly based on [this](TBC), although we implement it slightly differently in this box, particularly the front end.
+Welcome to the Logmein Box tutorial! In this tutorial, we will implement cryptography at the contract level, and use it as a log in tool. The this contract is mostly based on [this](https://github.com/srdtrk/nft-authorization), but we implement it slightly differently in this box, particularly the cryptographic scheme.
 
-We would like to note that using cryptography at the contract level can be complex for production-level dapps. Particularly, it is easy to have vulnerabilities, particularly if you don't fully understand the cryptography. Alas, this contract as it stands is definitely not suitable as a production-level contract. Our goal is to demonstrate concepts and help you learn new things to take with you to develop your own production-level dapps. We will discuss some of the issues later in the lesson, for your interest. Perhaps you could find ways to solve these issues and create an actual user-facing logmein dapp?
+Using cryptography at the contract level can be complex, and it’s easy to have vulnerabilities if you don’t fully understand the cryptography. Alas, this contract is not suitable for production-level use. Our goal is to demonstrate concepts and help you learn new things to develop your own production-level dapps. We’ll discuss some of the issues later in the lesson. Perhaps you could find ways to solve these issues and create an actual user-facing login dapp?
 
 You can work through this Secret box using either Gitpod or your local environment. If you prefer to use your local environment, you can follow the “Getting Started” steps in the [README of this repo](https://github.com/secretuniversity/logmein-vuejs-box/blob/main/README.md) to set everything up.
 
 ## Prerequisites
 
-We assume you are familiar with building simple Secret contracts, including implementing viewing keys and permits. If not, we've got you covered with our [RichieRich Secret Box](TBC) and [Viewing Key and Permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
+We assume you are familiar with building simple Secret contracts, including implementing viewing keys and permits. If not, check out our [RichieRich Secret Box](https://github.com/secretuniversity/richie-rich-vuejs-box) and [Viewing Key and Permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits).
 
-An addition, we assume you have basic conceptual understanding of the role of private and public keys in assymetric cryptography. We are not saying that you need to understand the math behind it, though. If you have spent any time in blockchain, you would be familiar with private and public keys -- a non-technical user will be familiar with the public key as it is sometimes referred to as the "account address" that anyone can view. The private keys are the things you should never share with anyone, and the thing that crypto scammers are always after! 
 
-The point is private keys can cryptographically sign messages, which can be verified using the correspending public key. If the verification passes, as long as the signer is the only party possessing the private key, we can be confident that the signed message had indeed originated from the intended sender (not forged) and the message content had not been tempered with. If you understand this conceptually, it's enough to follow our tutorial.
+In addition, we assume you have a basic understanding of the role of private and public keys in asymmetric cryptography. You don’t need to understand the math behind it. If you’ve spent any time in blockchain, you’ll be familiar with private and public keys – a non-technical user will know the public key as the “account address” that anyone can view. The private keys are what you should never share with anyone and what crypto scammers are always after!
 
-We also use a similar design for the front end as we did with other more basic boxes. It might be worth looking at RichieRich for example, to understand how we implemented permit creation, which is done by the front end application.
+Private keys can cryptographically sign messages, which can be verified using the corresponding public key. If the verification passes and the signer is the only party possessing the private key, we can be confident that the signed message originated from the intended sender (not forged) and that the message content hasn’t been tampered with. If you understand this conceptually, it’s enough to follow our tutorial.
+
+We also use a similar design for the front-end as we did with other boxes. It might be worth looking at RichieRich for example, to understand how we implemented permit creation, which is done by the front-end application.
+
 
 ## Contract overview
 
 In our box, we have these hypothetical services:
-- A web app called Secretbook, a hypothetical social media application that the user wishes to log into. From here, we will refer to our web app simply as `Secretbook` to mean "any web application that is able to accept a login using the Logmein service"
-- Logmein, which is a service that sits in the middle between the user and the web app. This service could be offered by a third party (analogous to a password manager), or can be directly controlled by the user him/herself. The Logmein contract essentially implements this service.
+- Secretbook, a hypothetical social media application that the user wants to log into. We’ll refer to our web app simply as Secretbook to mean “any web application that can accept a login using the Logmein service.”
+- Logmein, a service that sits between the user and the web app. This service could be offered by a third party (like a password manager) or directly controlled by the user. The Logmein contract implements this service.
 
-The idea is to allow the user to log in to Secretbook by owning a Secret NFT. The The Logmein service enables users to prove ownership of the NFT without revealing their account address directly with Secretbook. This is done using a modified SNIP721 reference implementation contract (which implement's Secret Network's NFT standard with additional features). The modified NFT contract allows users to create a cryptographic keypair. The public key is stored in the public metadata, and the private key in the private metadata. 
+The idea is to allow the user to log into Secretbook by owning a Secret NFT. The Logmein service enables users to prove ownership of the NFT without revealing their account address directly to Secretbook. This is done using a modified SNIP721 reference implementation contract (which implements Secret Network’s NFT standard with additional features). The modified NFT contract allows users to create a cryptographic key pair. The public key is stored in the public metadata and the private key in the private metadata.
 
-When the user wishes to log into Secretbook, the follow steps occur:
-- Secretbook randomly generates an arbitrary message and shares it with the user 
-- the user connects with Logmein, which requests permission to view the private metadata
-- Logmein then uses the private key stored in the private metadata to sign the message Secretbook generated, which produces a digital signature.
-- The digital signature is then handed to the Secrebook to verify. Secretbook verifies the signature against the public key stored in the NFT's public metadata. If successfully verified, it means that the user indeed owns that NFT, as they would not have been able to access the private key to sign the randomly generated message otherwise.
+When the user wants to log into Secretbook, these steps occur:
+- Secretbook randomly generates an arbitrary message and shares it with the user.
+- The user connects with Logmein, which requests permission to view the private metadata.
+- Logmein uses the private key stored in the private metadata to sign the message Secretbook generated, producing a digital signature.
+- The digital signature is then handed to Secretbook to verify. Secretbook verifies the signature against the public key stored in the NFT’s public metadata. If successfully verified, it means that the user indeed owns that NFT, as they wouldn’t have been able to access the private key to sign the randomly generated message otherwise.
 
-Of course, there are some issues with this implementation, for example the need to trust the Logmein service. We will discuss this and other issues later in the lesson. But for our Secret Box exercise, our goal is to implement this design, which we can think of as the first step towards an actual login service.
+Of course, there are some issues with this implementation, such as the need to trust the Logmein service. We’ll discuss this and other issues later in the lesson. But for our Secret Box exercise, our goal is to implement this design as a first step towards an actual login service.
 
 
 ## Web application overview
 
-In addition to the contract itself, we also have a web application frontend as part of this box. We will use secret.js and Vue.js, walking through the required code to get a front end application to interact with the Secret contract. The frontend GUI design itself is intended to help developers understand the mechanics of the Logmein design. As with most of our other contract-focused boxes, the GUI is not streamlined in a way that is suitable or intended for end-users.
+In addition to the contract itself, we also have a web application frontend as part of this box. We will use secret.js and Vue.js, walking through the required code to get a front end application to interact with the Secret contract. The frontend GUI design itself is intended to help developers understand the mechanics of the Logmein design. Like most of our other contract-focused boxes, the GUI isn’t streamlined in a way that’s suitable or intended for end-users.
 
-Of course, if you want, you can implement a GUI more suitable for an end-user facing app, which will primarily be a "pure" Web2 undertaking. We won't cover this, as our focus for ths box is the interface between the front-end and the contract, in addition to the signature verification process done by Secretbook.
+Of course, if you want, you can implement a GUI more suitable for an end-user facing app, which will primarily be a "pure" Web2 undertaking. We won't cover this, as our focus for ths box is the interface between the front-end and the contract and the signature verification process done by Secretbook.
 
 ## Tutorial starting point
 
@@ -49,15 +51,15 @@ Start by opening the Secret box on Gitpod or in your local environment. If you a
 - An incomplete web app launched, which includes this tutorial
 
 Additionally, you should also have three terminal windows open:
-- LocalSecret: The first terminal displays the blockchain starting up and producing blocks
-- Secret Box workspace: The second terminal is where you will compile and deploy your contract and enter commands as you go through this tutorial
-- Web application frontend: The third terminal is where you will launch your application server after LocalSecret is running and the Secret contract has been created
+- `LocalSecret`: The first terminal displays the blockchain starting up and producing blocks
+- `Secret Box workspace`: The second terminal is where you will compile and deploy your contract and enter commands as you go through this tutorial
+- `Web application frontend`: The third terminal is where you will launch your application server after LocalSecret is running and the Secret contract has been created
 
 If you are running locally, make sure to have these three terminals open as well.
 
 The files you will be working with are:
-- src/* : these are the contract source files
-- app/src/components/SecretBox/* : these are the front-end source files
+- `src/*` : these are the contract source files
+- `app/src/components/SecretBox/*` : these are the front-end source files
 
 In these files, look for sections marked with the comments `// complete code here`. These are the core parts of code required to implement authenticated queries.
 
@@ -65,11 +67,11 @@ In these files, look for sections marked with the comments `// complete code her
 ## Logmein contract design
 
 The Logmein contract is a modified Secret NFT. It has all the features of a SNIP721 token, with a few additions:
-- it accepts an additional execute msg to generate a new keypair
-- a new keypair gets generated when the token is transferred
-- (optional): a keypair is automatically crated when the token is minted. 
+- It accepts an additional execute message to generate a new keypair.
+- A new keypair gets generated when the token is transferred.
+- (Optional): A keypair is automatically created when the token is minted.
 
-The last item, which is optional, is not implemented in this Secret Box, although we left some incomplete code commented out for you to implement this if you are up for the challenge. Are are pros and cons to doing this. Automatically generating a keypair when a token gets minted means there will always be a keypair stored on the NFT, which may have some benefits if you definitely want to use this keypair feature.
+The last item, which is optional, is not implemented in this Secret Box. However, we left some incomplete code commented out for you to implement this if you are up for the challenge. There are pros and cons to doing this. Automatically generating a keypair when a token gets minted means there will always be a keypair stored on the NFT, which may have some benefits if you definitely want to use this keypair feature.
 
 As a modified NFT, a logical first step is to fork the SNIP721 reference implementation. This contract is a fork of the [SNIP721 reference implementation](https://github.com/baedrik/snip721-reference-impl). Specifically, this particular box forked commit ed7c59d, which was made on 4th Jan 2023.
 
@@ -126,7 +128,7 @@ pub struct Extension {
 
 ### Exercise: defining a method to add auth_key
 
-We want the Metadata type to have a method called `add_auth_key` which accepts a 32-byte array and makes that the token's auth_key. It should not modify any existing information in the token's metadata. 
+We want the Metadata type to have a method called `add_auth_key` which accepts a 32-byte array and assigns that as the token's auth_key. It should not modify any existing information in the token's metadata. 
 
 There are several ways to implement this. In our code, we have implemented this method on both Metadata and Extension. Your task is to complete this code. Note that if there is a token_uri (ie: metadata that is stored off-chain), it will throw an error.
 
@@ -183,14 +185,14 @@ In the execute entry point function, we need to handle the new variant we define
 ## Functions that generate keypairs
 
 We have a total of four new functions in contract.rs to handle generating keypairs. 
-- metadata_generate_keypair checks that the message caller is indeed authorized to generate keypairs for the token. If so, we call the next function, metadata_generate_keypair_impl. Otherwise, we throw an error.
-- metadata_generate_keypair_impl calls the generate_keypair function using the prng seed as input, then updating this seed. Then, it updates the NFT's private and public metadata with the private and public keys respectively.
-- generate_keypair calls the new_entropy function to produce a random byte array based on the Optional user input and prng_seed. It then uses this byte array output to generate an ed25519 keypair using the ed25519 Rust package. 
-- new_entropy takes an entropy input and the prng_seed stored in the contract as inputs. It then mixes this with some additional entropy, such as the block time and height, to produce a random 256-bit number.
+- `metadata_generate_keypair` checks that the message caller is indeed authorized to generate keypairs for the token. If so, we call the next function, `metadata_generate_keypair_impl`. Otherwise, we throw an error.
+- `metadata_generate_keypair_impl` calls the `generate_keypair` function using the prng seed as input, before updating this seed. Then, it modifies the NFT's private and public metadata with the new private and public keys respectively.
+- `generate_keypair` calls the `new_entropy` function to produce a random byte array based on the optional user input and prng_seed. It then uses this byte array output to generate an ed25519 keypair using the ed25519 Rust package. 
+- `new_entropy` accepts an entropy string and a prng_seed as inputs. It mixes these with additional entropy, such as block time and height, to produce a random 256-bit number.
 
 > **A note of caution generating random numbers this way**
 >
-> Generating numbers fully on-chain is challenging to do in a secure way. Even with the ability to have a hidden prng_seed does not solve problems for all use cases. For this use case, generating random numbers like this is mostly secure. For most other applications, we recommend using Secret Networks VRF.
+> Generating numbers fully on-chain is challenging to do in a secure way. Even the ability to have a hidden prng_seed does not solve all problems for many use cases. Generating random numbers like this is mostly secure in this particular use-case. For most other applications, we recommend using Secret Networks VRF.
 
 ### Exercise: authenticating the caller
 
@@ -216,11 +218,11 @@ We have defined the error message. Your task is to write the logic that authenti
 
 ### Exercise: using prng_seed to call generate_keypair
 
-Navigate to the metadata_generate_keypair_impl function. Notice there are three blocks of code to complete. Let's start with the first block, which should call the generate_keypair function using the prng_seed as input.
+Navigate to the metadata_generate_keypair_impl function. Notice there are three blocks of code to complete. Let's start with the first block, which should call the generate_keypair function using prng_seed as the input.
 
 
 <details> <summary> Hint 1: </summary>
-We need to call the valued stored in PRNG_SEED_KEY, which is used as an input to generate a keypair. Once we use this seed, we need to modify it so we are not reusing the same seed the next time a keypair is generated with this contract. Notice the generate_keypair function returns a new prng_seed, which we should use.
+We need to retrieve the value stored in PRNG_SEED_KEY, which is used as an input to generate a keypair. We should then modify it so we don't reuse the same seed the next time a keypair is generated with this contract. Notice the generate_keypair function returns a new prng_seed.
 </details>
 
 <details> <summary> Solution: </summary>
@@ -250,20 +252,20 @@ pub fn instantiate(
 
 ### Exercise: updating the metadata
 
-Now that we have the public and private keys, we need to update the NFT's metadata. Your task is to write the code for this.
+Now let's update the NFT's metadata. Your task is to write the code for this.
 
 
 <details> <summary> Hint 1: </summary>
-We want to update the auth_key field only, and keep any other metadata unchanged. This means we need to first load the existing metadata.
+We should update the auth_key field while keeping other metadata values unchanged. So we need to load the existing metadata first.
 </details>
 
 <details> <summary> Hint 2: </summary>
-We should use the add_auth_key method we defined earlier for the Metadata type.
+Use the add_auth_key method we implemented on the Metadata type.
 </details>
 
 
 <details> <summary> Hint 3: </summary>
-There may be no metadata stored in the NFT. In this situation, we should create a metadata entry with default values. We will need to import token::Extension to do this.
+The metadata stored in the NFT may be set to `None`. In this situation, we should create a metadata entry with default values. Import token::Extension to do this.
 </details>
 
 
@@ -329,12 +331,12 @@ pub fn instantiate(
 ### Exercise: generating the ed25519 keypair
 
 Your task is to generate the keypair, which involves the following steps:
-- generate new prng seed, which should call the new_entropy function 
-- use this prng seed as input to a ChaChaRng algorithm to generate random bytes 
-- use this random bytes output to create an ed25519 keypair
+- Generate new prng seed, which should call the new_entropy function 
+- Use this prng seed as input to a ChaChaRng algorithm to generate random bytes 
+- Use the random bytes to create an ed25519 keypair
 
 <details> <summary> Hint 1: </summary>
-We need to handle the fact that user entropy is an optional input. If the user did not provide entropy, we can use the prng_seed or any other substitute entropy.
+We need to handle the fact that user entropy is an optional input. If the user does not provide entropy, we can use the prng_seed as substitute entropy.
 </details>
 
 <details> <summary> Hint 2: </summary>
@@ -342,7 +344,7 @@ We have already imported the ChaChaRng package. Use this to generate a seed from
 </details>
 
 <details> <summary> Hint 3: </summary>
-The ed25519_dalek::Keypair struct has an associated function called generate. Use this to generate a keypair from the seed.
+The ed25519_dalek::Keypair struct has an associated function called `generate`. Use this to generate a keypair from the seed.
 </details>
 
 
@@ -370,15 +372,15 @@ pub fn generate_keypair(
 
 > **Why did we need so many steps?**
 >
-> The generate_keypair function involved two separate things: generating a random number and creating an ed25519 keypair. Let's discuss each one:
+> The generate_keypair function involved two separate processes: generating a random number and creating an ed25519 keypair. Let’s discuss each one:
 
 > **What are the steps required to generate random numbers?**
 >
-> Random number generation is a complex topic, and often vulnerable in a blockchain context. In general, generating random numbers involves two steps. Collecting entropy, and running a deterministic random bit generator (DRBG), also known as a pseudorandom number generator (PRNG). The entropy is the reason that the random output changes. Greater entropy results in greater unpredictability. A good source of entropy is high unpredictable. For example, quantum fluctuations or radioactive decay are very good sources of entropy. On the other extreme, using a constant (not matter how large the number) as the entropy will result in the same "random" output every time. 
+> Random number generation is a complex topic, and often vulnerable in a blockchain context. In general, generating random numbers involves two steps. Collecting entropy, and running a deterministic random bit generator (DRBG), also known as a pseudorandom number generator (PRNG). The entropy is the reason that the random output changes. Greater entropy results in greater unpredictability. A good source of entropy is highly unpredictable. For example, quantum fluctuations or radioactive decay are very good sources of entropy. On the other extreme, using a constant (not matter how large the number) will result in the same "random" output every time. 
 >
 > In general it is better to collect entropy sources from the "analog" world. In Web2 implementations, random number generators often use inputs from hardware such as temperature or vibration frequency of the computer cooling fan as entropy input. In the blockchain world, unfortunately, things are deterministic and isolated from the analog world, which poses a challenge in finding entropy sources. 
 >
-> In our contract, we use a user provided input, combined with the old prng seed, some block time and height information as our entropy. All these result in a new prng seed. It is not ideal, but good enough in our situation. 
+> In our contract, we use a user-provided input, the old prng seed, and block time and height information as our entropy. All these result in a new prng seed. It is not ideal, but good enough in our situation (where the caller is indifferent to the random output).
 >
 > Once we collect our entropy, we run the new prng seed through a DRBG. A DRBG is, as its name suggests, a deterministic algorithm. The purposes is not to create randomness (that's the entropy's job), but instead to ensure the output has desirable properties for a random number generator. For example, it should be close to impossible for an attacker to gain an advantage in guessing future outputs based on the sequence of previous outputs. Another example is a DRBG should (normally) produce a uniformly distributed output over the possible range.
 >
@@ -387,7 +389,7 @@ pub fn generate_keypair(
 
 > **What is ed25519?**
 >
-> ed25519 is a signature scheme created in 2011. A signature scheme defines the parameters and algorithm used in the signing, verifying and key creation processes. ed25519 is an improvement over many of its predecessors. Is uses curve25519 which is significantly more performant than the secp256k1 curve, for example. Note that Secret Network's query permits are implemented using the secp256k1 scheme, which is a different curve that Bitcoin popularized, and has its pros and cons. 
+> ed25519 is a signature scheme. A signature scheme defines the parameters and algorithm used in the signing, verifying and key creation processes. ed25519 is an improvement over many of its predecessors. Is uses curve25519 which is significantly more performant than the secp256k1 curve, for example. Note that Secret Network's query permits are implemented using the secp256k1 scheme, which is a different curve that Bitcoin popularized, and has its pros and cons. 
 
 
 ### Exercise: adding entropy
@@ -395,11 +397,11 @@ pub fn generate_keypair(
 The final function new_entropy gathers entropy from various sources and outputs a 256-bit number. Your task is to add additional entropy then return a [u8;32] array.
 
 <details> <summary> Hint 1: </summary>
-We need to add the user entropy and seed to the rng entropy.
+Add the user entropy and seed to the rng entropy.
 </details>
 
 <details> <summary> Hint 2: </summary>
-We can also add block time in nanoseconds, which is quite difficult to guess ahead of time.
+You can also add block time in nanoseconds, which is quite difficult to guess ahead of time.
 </details>
 
 
@@ -427,10 +429,10 @@ pub fn new_entropy(
 
 ### Exercise: changing keypair on ownership transfer
 
-We want our NFT to generate a new keypair when it changes ownership. Your task is to work what code to add, andwhich function to add this to.
+Our NFT should generate a new keypair when it changes ownership. Your task is to work what code to add, and which function to add this to.
 
 <details> <summary> Hint 1: </summary>
-We have written this commented `// complete this code` where you should be adding code. This basically answers the question on where to add the code.
+We have written the comment `// complete this code` at the location you should add code.
 </details>
 
 <details> <summary> Hint 2: </summary>
@@ -457,7 +459,7 @@ We have unit tests written for handle functions and some specifically focusing o
 - mod unittest_handles
 - mod unittest_auth
 
-This would bring these two unit test mods into scope. When we run unit tests in the next step, it will ensure that our contract is working the way we intended.
+This would bring these two unit test mods into scope, so we can test that the contract is working as intended.
 
 Our contract is now complete. Let's make sure it compiles, then redeploy it to our local blockchain. In your second terminal, run the following commands:
 
@@ -482,7 +484,7 @@ The shellscript additionally changes the environment variables, such as SECRET_B
 
 ## Revising the frontend
 
-The crux of the frontend are these two functionality:
+The crux of the frontend are these two functions:
 - Logmein service digitally signing a message using the private key stored in the NFT private metadata  
 - Secretbook app verifying this signature using the public key stored in the NFT public metadata
 
@@ -494,7 +496,7 @@ import * as ed from '@noble/ed25519'
 
 We will use the signature and verification implementations of this package.
 
-The LogmeinService.vue file handles the signing and verification process. To understand the code, first look at the onButtonClicked function. This function is called when you click on the button with text "Create signature with LogMeIn, and attempt to sign in to Secretbook app" in the frontend GUI. This performs the steps required in the login process we described early in this tutorial:
+The LogmeinService.vue file handles the signing and verification process. To understand the code, first look at the `onButtonClicked` function. This function is called when you click on the button with text "Create signature with LogMeIn, and attempt to sign in to Secretbook app" at the bottom of the frontend GUI. Clicking the button initiates the steps required in the login process we described early in this tutorial:
 - Secretbook (our hypothetical app which the user wishes to log into) generates a random plaintext message
 - Logmein receives this message and signs it using the private key stored in the NFT
 - Logmein sends this signature to Secretbook as a login request
@@ -502,7 +504,7 @@ The LogmeinService.vue file handles the signing and verification process. To und
 
 ### Exercise: Signing a message
 
-Navigate to app/src/components/SecretBox/LogmeinService.vue and find the lmiSign function. The signature variable right now just references the message. Your task is to edit the code so signature is the output of an ed25519 signature of the message using the private key.
+Navigate to app/src/components/SecretBox/LogmeinService.vue and find the `lmiSign` function. The `signature` variable right now just references the message. Your task is to edit the code so `signature` is the output of an ed25519 signature of the message.
 
 <details> <summary> Solution: </summary>
 
@@ -533,7 +535,7 @@ async function verifySignature(
 
 ### Exercise: Verifying login
 
-Now go to verifyLogin. This should call the verifySignature function and return a boolean on whether the signature if valid or now.
+Now go to verifyLogin. This should call the verifySignature function and return a boolean on whether the signature is valid or not.
 
 <details> <summary> Solution: </summary>
 
@@ -564,21 +566,22 @@ const verifyLogin = async (
 - At this point your front end app should look like this: ![screenshot](./illustrations/logmein-app-screenshot.png)
 
 The app is designed to help developers understand how this implementation of logmein works by interacting with a graphical user interface (GUI). The GUI is divided into two sections:
-- Contract interface, which includes the account-level messages subsection and queries subsection. 
-- Log Me In interface, which includes the Log Me In service and Secretbook App login subsections
+- Contract interface, which comprises the account-level messages and queries subsections. 
+- Log Me In interface, which comprises the Log Me In service and Secretbook App login subsections.
 
-The first subsection, account-level messages, are for execute messages (on-chain) and permit generation (off-chain). There are two accounts. The first account can mint new NFTs, transfer NFTs, and generate keypairs for its NFTs. Additionally, it can generate permits for any of its NFT, which is done offchain (note that permits are generated off-chain. See our Viewing Keys and Permit pathway or RichieRich SecretBox to understand this better). The second account can do all these except that it cannot mint NFTs.
+The first subsection, account-level messages, are for sending execute messages (on-chain) and permit generation (off-chain). There are two accounts. The first account can mint new NFTs, transfer NFTs, and generate keypairs. Additionally, it can generate permits for any of its NFT, which is done offchain (note that permits are generated off-chain. See our Viewing Keys and Permit pathway or RichieRich SecretBox to understand this better). The second account can do all these except minting NFTs.
 
-The second subsection, queries, allows us to see the public information on all tokens we have created so far. Queries are not account-specific, as contracts cannot verify the caller for queries securely. The query section represents “any” party who wishes to send a query message.
+The second subsection, queries, allows you to see public information on all tokens created. Queries are not account-specific, as contracts cannot verify the caller for queries securely. The query section represents “any” party who wishes to send a query message.
 
-This is an example of the query result after minting three tokens, generated keypairs for two of them, generating a permit for one of them, and transfering one to Account1: ![screenshot](./illustrations/logmein-app-query-screenshot.png)
+This is an example of the query result after minting three tokens, generating keypairs for two of them, generating a permit for one of them, and transfering one from Account0 to Account1: ![screenshot](./illustrations/logmein-app-query-screenshot.png)
 
+In the Log Me In service, you can enter the token_id you wish to use to log in to Secretbook, and the corresponding query permit index. If successful, you will see the newly generated permit added to the list of permits towards the bottom of the app. We index each permit with an integer; the first permit you generate should be numbered `1`. This is for convenience when you later use this permit to log in. Instead of typing the entire permit JSON, you only need to specify the index and the app pulls the correct permit.
 
-In the Log Me In service, we can enter the token_id we wish to use to log in to Secretbook, and the corresponding query permit index. Note that generating permits is done by the front-end app with no interaction with the contract. If successful, you will see the newly generated permit added to the list of permits towards the bottom of the app. We index each permit generated with an integer; the first permit you generate should be numbered `1`. This is for convenience when you later use this permit to log in. Instead of typing the entire permit JSON, you only need to specify the index and the app pulls the correct permit.
+Note that SNIP721 permits work across all tokens in the contract. The way to control which token's private data is viewable is to use this in combination with the `set_whitelisted_approval` functionality, which is not implemented here for simplicity.  
 
 In the Secretbook app subsection, we see the result of our most recent attempted login. Note that it starts with "Login failed" when the our Secretbox app initializes. 
 
-Now, try minting a new NFT with token_id "myNFT", then generate a keypair and permit for it. We now have an NFT for Account0 that has a keypair, so this NFT can be used to log in. Also, with a permit, Account0 can give the Log Me In service access to the private key. To check this, go to the queries subsection, and click the button "Query token data". You will see the public jinformation of this token. Now go to the Log Me In section, enter "myNFT" as the token_id and "1" as the permit index. Click the button "Create signature with LogMeIn, and attempt to sign in to Secretbook app". Now see if there is a green box with "Login Successful" just below.
+Now, try minting a new NFT with token_id "myNFT". Then generate a keypair and permit for it, by entering an arbitrary permit name and clicking the "Sign permit" button. We now have an NFT for Account0 that has a keypair, so this NFT can be used to log in. Also, with a permit, Account0 can give the Log Me In service access to the private key. To check this, go to the queries subsection, and click the button "Query token data". You will see the public information of this token. Now go to the Log Me In section, enter "myNFT" as the token_id and "1" as the permit index. Click the button "Create signature with LogMeIn, and attempt to sign in to Secretbook app". Now see if there is a green box with "Login Successful" just below.
 
 
 
@@ -586,29 +589,31 @@ Now, try minting a new NFT with token_id "myNFT", then generate a keypair and pe
 
 > **What's the issue with this implementation?**
 > 
-> The goal of LogMeIn is to try to improve user experience in the Web3 space. Instead of remember a username and password, you just own an NFT. However, there are several issues with this specific implementation that falls short of that goal if we were to launch this as a production-ready application. We will discuss two categories of problems: usability and security. 
+> The goal of LogMeIn is to try to improve user experience in the Web3 space. Instead of having to remember a username and password, you just need to own an NFT. However, there are several issues with this implementation that falls short of that goal if we were to launch this as a production-ready application. We will discuss two categories of problems: usability and security. 
 >
 > Usability: 
-> - The app that the user wishes to sign into needs to work with Logmein. This raises immediate questions about adoption.
-> - The user experience is not really easier than a traditional Web2 solution, such as a password manager. The user needs to create a permit to grant LogMeIn permission to accept the private Metadata. The user is likely to need a Web3 wallet for this. The user also needs to acquire an NFT, and remember which NFT corresponds to which login. They could, of course, use a single NFT for all their logins. But that risks losing access to their accounts if they lose access to their NFT. 
-> - A valid criticism is whether using private/public keys this way is overengineering. Why not just store the username and password in the metadata? This may also solve the adoption problem mentioned above. Additionally, simpler is generally better as it reduces the surface area of attack.
+> - The app that the user wishes to log into needs to work with Logmein. This raises immediate questions about adoption.
+> - User experience is not easier than a traditional Web2 solution, such as a password manager. The user needs to create a permit to grant LogMeIn permission to view the private Metadata. The user is likely to need a Web3 wallet for this. The user also needs to acquire an NFT, and remember which NFT corresponds to which login. They could, of course, use a single NFT for all their logins. But that risks losing access to all their accounts if they lose access to the NFT. 
+> - A valid criticism is whether using digital signatures is overengineering. Why not just store usernames and passwords in the metadata? This may also solve the adoption problem mentioned above. Additionally, simpler implementations are generally better as this reduces the surface area of attack.
 >
 > Security:
-> - The user needs to trust LogMeIn. After LogMeIn signs the message from SecretBook, it possesses a signature that can be used to log in without the user's authorization. For example, it can sell the signature to an adversary. Note that the user may not even be aware that they had just been compromised, making it a "silent attack".
-> - This is why we have Secretbook generating a random plaintext message to be signed for each log in. This way, the only way LogMeIn can gain unauthorized access is if it uses the signautre to log in before the user does. The advantage here is that the user will be aware that they have just been compromised, ie: a "loud attack".
-> - However, this doesn't really solve the problem. LogMeIn still has the private key of the NFT keypair. It can make another request to Secretbook, create a new signature, and sign in without the user's authorization. What if the user generates a new keypair after each log in attempt? Unfortunately, LogMeIn still possesses the user's query permit. The user can of course, revoke the permit and change their NFT keypair after every log in atttempt. But this raises the question about usability, including paying for the gas fees of two transactions for every log in attempt. 
-> - LogMeIn can of course be a local client installed by the user, whose code is open source (auditable). This helps as the signing process no longer needs to be trustless. However, it does not help with usability. Additionally, the world process of cryptographically signing messages becomes quite redundant without the need for trustlessness.  
+> - The user needs to trust LogMeIn. After LogMeIn signs a message from SecretBook, it possesses a signature that can be used to log in without the user's authorization. For example, it can sell the signature to an adversary. Note that the user cannot easily tell if they had just been compromised, making this a "silent attack".
+> - In our case, Secretbook generates a random plaintext message for signature for each log in attempt. This way, the only way LogMeIn can gain unauthorized access is if it uses the signature before the user does. The advantage here is that the user will know if they are compromised, ie: a "loud attack", as they will have a failed login.
+> - However, this doesn't really solve the problem. LogMeIn still has the private key of the NFT keypair. It can make another request to Secretbook, create a new signature, and sign in without the user's authorization. The user could try to address this by changing the NFT keypair after each log in attempt. Unfortunately, LogMeIn still possesses the user's query permit. The user can of course, revoke the permit and change their NFT keypair after every log in attempt. But this raises the question about usability, including paying for the gas fees of two transactions for every log in attempt. 
+> - LogMeIn can of course be a local client installed by the user, where it is in control of the data, eliminating the issues of trust. However, the whole process of cryptographically signing messages becomes redundant without the need for trustlessness.  
 
-So, it may not be entirely unfair to criticize LogMeIn that it is overengineered, has a large surface area of attack, requires trusting a party, and doesn't improve user experience. But then, if it were production-ready, we would have taken this idea further, rather than making a Secret Box. The idea of this box is to showcase implementing cryptography at a contract level. Thanks to this we showed you how we can implement assymetric cryptography in contracts. Note that query permits are largely based on these concepts. It is a real example of applying cryptography at the application level. 
+So, one may criticize LogMeIn that it is overengineered, has a large surface area of attack, requires trusting a party, and doesn't improve user experience. But then, if it were production-ready, we would have taken this idea further, rather than making a Secret Box. This box is for teaching purposes. We showed you that you can implement asymmetric cryptography in contracts. We also hope this box also illustrates the need to have a very keen eye on vulnerabilities when doing so.
 
-We hope you will push the boundaries by using cryptography in your contracts, and if you chose to do so, we hope this box also illustrates the need to have a very keen eye on vulnerabilities when doing so.
+But if you understand this, you have a powerful tool in your arsenal. For instance, query permits are largely based on these concepts, and is a real world example of applying cryptography at the application level.
 
 
 > **Additional exercises**
 >
 > Streamline the front end to be more suitable for a user-facing application.
 >
-> Change the design such that a keypair is created when minting an NFT. With this, all NFTs will have a keypair stored in its metadata (unlike our implementation, where newly minted NFTs have no keypairs). This way, users do not need to create a keypair on newly minted NFTs before using them. 
+> Change the design such that a keypair is created when a new NFT is minted. With this, all NFTs will have a keypair stored in its metadata (unlike our implementation, where newly minted NFTs have no keypairs). 
+>
+> When we instantiate our contract, it set this config: `config::public_owner = Some(true)`. You could argue that it fails the purpose of using LogMeIn if we allow anyone to view the owner of the NFT. We did this for convenience; allowing our query function to retrieve the full list of NFTs minted. It is hard understand what is happening when everything is hidden. For a proper implementation, you should mint NFTs where `config::public_owner = Some(false)`. You can try instantiating a contract with this config instead. Remember to update the `.env` files too.
 >
 > Solve any of the problems we just discussed in "What's the issue with this implementation"?
 
@@ -619,7 +624,7 @@ We at [Secret University](https://scrt.university) hope you've not only enjoyed 
 
 ## Further Reading
 
-- Our [RichieRich Secret Box](TBC)
+- Our [RichieRich Secret Box](https://github.com/secretuniversity/richie-rich-vuejs-box)
 
 - Our [viewing keys and permit pathway](https://scrt.university/pathways/33/implementing-viewing-keys-and-permits) discusses authenticated queries in detail. 
 
