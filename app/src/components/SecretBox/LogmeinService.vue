@@ -53,21 +53,19 @@ async function queryAuthKey() {
   }
 }
 
-function randomPlaintext(): Uint8Array {
-  return Uint8Array.from([Math.random()]);
-}
-
-async function lmiSign(
-  message: Uint8Array
-) {
+async function lmiSign() {
   const privKey = await queryAuthKey()
 
   if (typeof privKey === 'undefined') {
     throw Error("Failed to log in. Could not query auth key, likely because permit is invalid")
   } 
 
-  // const message = Uint8Array.from([0xab, 0xbc, 0xcd, 0xde]);
-  const signature = await ed.signAsync(message, Uint8Array.from(privKey));
+  const message = Uint8Array.from([0xab, 0xbc, 0xcd, 0xde]);
+
+  //
+  // edit code below
+  //
+  const signature = message
 
   console.log(`created signature: ${signature}`)
   console.log(`the public key should be ${await ed.getPublicKeyAsync(Uint8Array.from(privKey))}`)
@@ -84,7 +82,11 @@ async function verifySignature(
   message: Uint8Array, 
   pubKey: Uint8Array
 ) {
-  const isValid = await ed.verifyAsync(signature, message, pubKey);
+  //
+  // edit code below
+  //
+
+  const isValid = true
   return isValid
 }
 
@@ -94,14 +96,9 @@ const verifyLogin = async (
   console.log(`verifying login for token_id: ${loginRequest.tokenId}; with signature: ${loginRequest.signature}; message: ${loginRequest.message}`)
   const pubKey = await queryPubKey(props.accounts[0], loginRequest.tokenId)
   if (pubKey !== undefined ) {
-    const isValid = await verifySignature(
-      loginRequest.signature,
-      loginRequest.message,
-      Uint8Array.from(pubKey),
-    )
-    console.log(`checked signature valid: ${isValid}`)
-    loginAttemptResult.value = isValid
-    return isValid
+    //
+    // complete code here
+    //
   } else {
     throw Error("failed to verify signature: could not determine if valid or not")
   }
@@ -114,11 +111,10 @@ async function onButtonClicked() {
   loginRequest.tokenId = inputs.lmiTokenId
   loginAttemptResult.value = false
 
-  // Secretbook creates a random plaintext message to be signed
-  const plaintextMessage = randomPlaintext()
-
   // LMI generates signature
-  loginRequest = await lmiSign(plaintextMessage)
+  //
+  // complete code here
+  //
 
   // Third Party App verifies siganture
   verifyLogin(loginRequest)
@@ -127,7 +123,7 @@ async function onButtonClicked() {
 </script>
 
 <template>
-  <h3 class="text-xl font-bold mt-5">Log Me In service</h3>
+  <h1 class="text-xl font-bold mt-5">Log Me In service</h1>
   <div v-for="row in formRows" class="w-full justify-items-center mt-4 ml-4 mb-4">
     <p class="italic mb-2">{{ row.headerText }}</p>
     <div class="grid grid-cols-3 grid-flow-col h-full leading-none">
@@ -149,7 +145,7 @@ async function onButtonClicked() {
   <hr class="border-gray-300">
   
   <div>
-    <h3 class="text-xl font-bold mt-5">Secretbook app</h3>
+    <h1 class="text-xl font-bold mt-5">Secretbook app</h1>
     <p>Secretbook is a hypothetical social media application where users can create personal profiles and share their life stories, post memes and chat with friends.</p>
     <p class="mt-8 text-center">Attempted to log in with token_id: {{ loginRequest.tokenId }}</p>
     <div v-if="loginAttemptResult !== null" class="flex justify-center mt-1 mb-5">

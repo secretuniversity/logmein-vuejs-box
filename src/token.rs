@@ -18,16 +18,6 @@ pub struct Token {
     pub transferable: bool,
 }
 
-/// token metadata
-#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug, Default)]
-pub struct Metadata {
-    /// optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or
-    /// `ar://`.  Only use this if you are not using `extension`
-    pub token_uri: Option<String>,
-    /// optional on-chain metadata.  Only use this if you are not using `token_uri`
-    pub extension: Option<Extension>,
-}
-
 impl Metadata {
     pub fn add_auth_key(&self, new_key: &[u8; 32]) -> StdResult<Metadata> {
         if self.token_uri.is_some() {
@@ -36,15 +26,26 @@ impl Metadata {
             ));
         }
 
-        let ext = &self.extension.clone().unwrap_or_default();
-
+        //
+        // edit code below
+        //
         Ok(
             Metadata {
                 token_uri: None,
-                extension: Some(ext.add_auth_key(new_key)),
+                extension: None,
             }
         )
     }
+}
+
+/// token metadata
+#[derive(Serialize, Deserialize, JsonSchema, Clone, PartialEq, Eq, Debug, Default)]
+pub struct Metadata {
+    /// optional uri for off-chain metadata.  This should be prefixed with `http://`, `https://`, `ipfs://`, or
+    /// `ar://`.  Only use this if you are not using `extension`
+    pub token_uri: Option<String>,
+    /// optional on-chain metadata.  Only use this if you are not using `token_uri`
+    pub extension: Option<Extension>,
 }
 
 /// metadata extension
@@ -82,14 +83,17 @@ pub struct Extension {
     /// token subtypes used by Stashh for display groupings (primarily used for badges, which are specified
     /// by using "badge" as the token_subtype)
     pub token_subtype: Option<String>,
-    /// represents public and privite key pair for authentication in public and private metadata respectively.
-    pub auth_key: Option<[u8; 32]>
+    //
+    // complete code here
+    //
 }
 
 impl Extension {
     fn add_auth_key(&self, new_key: &[u8; 32]) -> Extension {
         Extension {
-            auth_key: Some(*new_key),
+            //
+            // complete code here
+            //
             ..self.clone()
         }
     }

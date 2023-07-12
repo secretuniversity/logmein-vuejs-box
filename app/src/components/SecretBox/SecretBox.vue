@@ -277,9 +277,8 @@ async function onUpdateButton() {
     </div>
 
     <div v-if="showAppContract">
-      <h3 class="text-xl font-bold mt-5">Account-level messages</h3>
       <div v-for="account in accounts.slice(0,2)">
-        <h4 class="mt-4">Account: {{ account.address }}</h4>
+        <h2 class="mt-4">Account: {{ account.address }}</h2>
         <div v-for="row in formExecRows" class="w-full justify-items-center mt-2 ml-4 mb-4">
           <div v-if="renderForm(account.address, row)">
             <p class="italic mb-2">{{ row.headerText }}</p>
@@ -303,7 +302,7 @@ async function onUpdateButton() {
         <hr class="border-gray-300">
       </div>
 
-      <h3 class="text-xl font-bold mt-5">Queries</h3>
+      <h1 class="text-xl font-bold mt-5">Queries</h1>
       <div v-for="qrow in formQueryRows" class="w-full justify-items-center mt-4 ml-4 mb-4">
         <p class="italic mb-2">{{ qrow.headerText }}</p>
         <div class="grid grid-cols-3 grid-flow-col h-full leading-none">

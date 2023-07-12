@@ -6,7 +6,7 @@ Welcome to the Logmein Box tutorial! In this tutorial, we will implement cryptog
 
 Using cryptography at the contract level can be complex, and it’s easy to have vulnerabilities if you don’t fully understand the cryptography. Alas, this contract is not suitable for production-level use. Our goal is to demonstrate concepts and help you learn new things to develop your own production-level dapps. We’ll discuss some of the issues later in the lesson. Perhaps you could find ways to solve these issues and create an actual user-facing login dapp?
 
-You can work through this Secret box using either Gitpod or your local environment. If you prefer to use your local environment, you can follow the “Getting Started” steps in the [README of this repo](https://github.com/secretuniversity/logmein-vuejs-box/blob/main/README.md) to set everything up.
+This SecretBox is meant to be completed on your local environment. You can follow the “Getting Started” steps in the [README of this repo](https://github.com/secretuniversity/logmein-vuejs-box/blob/main/README.md) to set everything up. Gitpod is not supported for this box, but we have the gitpod.yml file which is meant to set up your environment on Gitpod, if you wish to try doing this on Gitpod. 
 
 ## Prerequisites
 
@@ -45,23 +45,18 @@ Of course, if you want, you can implement a GUI more suitable for an end-user fa
 
 ## Tutorial starting point
 
-Start by opening the Secret box on Gitpod or in your local environment. If you are using Gitpod, your environment should be properly set up and your workspace should include:
-- A running LocalSecret blockchain instance
-- An initial version of the contract uploaded to LocalSecret
-- An incomplete web app launched, which includes this tutorial
+Start by opening the Secret box in your local environment. 
 
-Additionally, you should also have three terminal windows open:
-- `LocalSecret`: The first terminal displays the blockchain starting up and producing blocks
-- `Secret Box workspace`: The second terminal is where you will compile and deploy your contract and enter commands as you go through this tutorial
-- `Web application frontend`: The third terminal is where you will launch your application server after LocalSecret is running and the Secret contract has been created
-
-If you are running locally, make sure to have these three terminals open as well.
+If you followed the guide on setting up your local environment, you should have these three terminal windows open:
+- LocalSecret: displays the blockchain starting up and producing blocks
+- Secret Box workspace: where you will compile and deploy your contract and enter commands as you go through this tutorial
+- Web application frontend: where you will launch your application server after LocalSecret is running and the Secret contract has been created
 
 The files you will be working with are:
 - `src/*` : these are the contract source files
 - `app/src/components/SecretBox/*` : these are the front-end source files
 
-In these files, look for sections marked with the comments `// complete code here`. These are the core parts of code required to implement authenticated queries.
+In these files, look for sections marked with comments such as `// complete code here`. These are the core parts of code required to implement authenticated queries.
 
 
 ## Logmein contract design
